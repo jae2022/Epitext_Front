@@ -278,16 +278,15 @@ const DetailPage = ({ item, onBack }) => {
                       }}
                     >
                       <p style={{ margin: 0 }}>
-                        처리 일시: {rubbingDetail.processed_at
+                        처리 일시:{" "}
+                        {rubbingDetail.processed_at
                           ? `${formatDate(rubbingDetail.processed_at)} ${new Date(rubbingDetail.processed_at).toLocaleTimeString("ko-KR", {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}`
                           : "-"}
                       </p>
-                      <p style={{ margin: 0 }}>
-                        총 처리 시간: {formatProcessingTime(rubbingDetail.total_processing_time)}
-                      </p>
+                      <p style={{ margin: 0 }}>총 처리 시간: {formatProcessingTime(rubbingDetail.total_processing_time)}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">

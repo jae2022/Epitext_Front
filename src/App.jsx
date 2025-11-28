@@ -1,29 +1,43 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import ListPage from "./pages/ListPage";
 import UploadPopup from "./pages/UploadPopup";
 import DetailPage from "./pages/DetailPage";
 import Sidebar from "./components/Sidebar";
-import { mockRubbingList, formatDate, formatProcessingTime } from "./mocks/mockData";
+import { getRubbings } from "./api/requests";
+import { formatDate } from "./mocks/mockData";
 
 function App() {
   const [showUploadPopup, setShowUploadPopup] = useState(false);
   const [activeMenu, setActiveMenu] = useState("전체 기록");
   const [completedIds, setCompletedIds] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [initialData, setInitialData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock 데이터를 프론트엔드에서 사용하는 형식으로 변환
-  const [initialData, setInitialData] = useState(
-    mockRubbingList.map((item) => ({
-      id: item.id,
-      status: item.status,
-      date: formatDate(item.created_at),
-      restorationStatus: item.restoration_status || "-",
-      processingTime: formatProcessingTime(item.processing_time),
-      damageLevel: item.damage_level ? `${item.damage_level}%` : "-",
-      inspectionStatus: item.inspection_status || "-",
-      reliability: item.average_reliability ? `${item.average_reliability}%` : "-",
-    }))
-  );
+  // 탁본 목록 데이터 로드
+  useEffect(() => {
+    const loadRubbings = async () => {
+      setIsLoading(true);
+      try {
+        // activeMenu에 따라 status 파라미터 설정
+        let status = null;
+        if (activeMenu === "복원 완료") {
+          status = "복원 완료";
+        } else if (activeMenu === "복원 진행중") {
+          status = "복원 진행중";
+        }
+
+        const data = await getRubbings(status);
+        setInitialData(data);
+      } catch (error) {
+        console.error("Failed to load rubbings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadRubbings();
+  }, [activeMenu]);
 
   // 메뉴 변경 핸들러 - DetailPage가 열려있으면 닫고 ListPage로 이동
   const handleMenuChange = (menu) => {
@@ -31,7 +45,7 @@ function App() {
     setSelectedItem(null); // DetailPage가 열려있으면 닫기
   };
 
-  // 필터링된 데이터
+  // 필터링된 데이터 (복원 완료/진행중은 API에서 필터링되지만, completedIds로 추가 필터링)
   const getFilteredData = () => {
     if (activeMenu === "복원 완료") {
       return initialData.filter((item) => completedIds.includes(item.id));
@@ -79,13 +93,19 @@ function App() {
         <DetailPage item={selectedItem} onBack={() => setSelectedItem(null)} />
       ) : (
         <>
-          <ListPage
-            onUploadClick={() => setShowUploadPopup(true)}
-            tableData={getFilteredData()}
-            completedIds={completedIds}
-            onComplete={handleComplete}
-            onViewDetail={(item) => setSelectedItem(item)}
-          />
+          {isLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-gray-600">로딩 중...</div>
+            </div>
+          ) : (
+            <ListPage
+              onUploadClick={() => setShowUploadPopup(true)}
+              tableData={getFilteredData()}
+              completedIds={completedIds}
+              onComplete={handleComplete}
+              onViewDetail={(item) => setSelectedItem(item)}
+            />
+          )}
           {showUploadPopup && <UploadPopup onClose={() => setShowUploadPopup(false)} onComplete={handleUploadComplete} />}
         </>
       )}
