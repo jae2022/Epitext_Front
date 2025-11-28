@@ -1,48 +1,12 @@
-import axios from "axios";
+import apiClient from "./client";
 import { mockRubbingList, formatDate, formatProcessingTime } from "../mocks/mockData";
-
-// API Base URL (환경 변수에서 가져오거나 기본값 사용)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-
-// Axios 인스턴스 생성
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// 요청 인터셉터 (인증 토큰 추가 등)
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("authToken");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// 응답 인터셉터 (에러 처리)
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // 인증 에러 처리
-      console.error("Authentication error");
-    }
-    return Promise.reject(error);
-  }
-);
 
 /**
  * 탁본 목록 조회
  * @param {string|null} status - 필터링할 상태 ("복원 완료", "복원 진행중" 등)
  * @returns {Promise} 탁본 목록 데이터
  */
-export const getRubbings = async (status = null) => {
+export const getRubbingList = async (status = null) => {
   // TODO: 백엔드 API 연결 시 주석 해제
   // try {
   //   const params = status ? { status } : {};
@@ -73,7 +37,7 @@ export const getRubbings = async (status = null) => {
       const filteredData = status
         ? formattedData.filter((item) => {
             if (status === "복원 완료") {
-              // is_completed가 true인 항목만 (또는 status가 "처리중"이 아닌 완료된 항목)
+              // is_completed가 true인 항목만
               return item.is_completed === true;
             } else if (status === "복원 진행중") {
               // is_completed가 false인 모든 항목 (처리중, 우수, 양호, 미흡 등 모두 포함)
@@ -87,4 +51,7 @@ export const getRubbings = async (status = null) => {
     }, 1000); // 1초 딜레이
   });
 };
+
+// 하위 호환성을 위한 별칭 (deprecated)
+export const getRubbings = getRubbingList;
 
