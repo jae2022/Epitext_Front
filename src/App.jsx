@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import ListPage from "./pages/ListPage";
 import UploadPopup from "./pages/UploadPopup";
 import DetailPage from "./pages/DetailPage";
 import Sidebar from "./components/Sidebar";
+import { mockRubbingList, formatDate, formatProcessingTime } from "./mocks/mockData";
 
 function App() {
   const [showUploadPopup, setShowUploadPopup] = useState(false);
@@ -10,89 +11,19 @@ function App() {
   const [completedIds, setCompletedIds] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
 
-  // 샘플 데이터 (state로 관리)
-  const [initialData, setInitialData] = useState([
-    {
-      id: 8,
-      status: "처리중",
-      date: "2025.10.28",
-      restorationStatus: "-",
-      processingTime: "-",
-      damageLevel: "-",
-      inspectionStatus: "-",
-      reliability: "-",
-    },
-    {
-      id: 7,
-      status: "우수",
-      date: "2025.10.28",
-      restorationStatus: "356자 / 복원 대상 23자",
-      processingTime: "3분 42초",
-      damageLevel: "20%",
-      inspectionStatus: "12자 완료",
-      reliability: "92%",
-    },
-    {
-      id: 6,
-      status: "양호",
-      date: "2025.10.28",
-      restorationStatus: "68자 / 복원 대상 12자",
-      processingTime: "3분 21초",
-      damageLevel: "35%",
-      inspectionStatus: "12자 완료",
-      reliability: "76%",
-    },
-    {
-      id: 5,
-      status: "우수",
-      date: "2025.10.28",
-      restorationStatus: "112자 / 복원 대상 8자",
-      processingTime: "3분 45초",
-      damageLevel: "15%",
-      inspectionStatus: "5자 완료",
-      reliability: "92%",
-    },
-    {
-      id: 4,
-      status: "우수",
-      date: "2025.10.28",
-      restorationStatus: "89자 / 복원 대상 31자",
-      processingTime: "5분 02초",
-      damageLevel: "41%",
-      inspectionStatus: "31자 완료",
-      reliability: "68%",
-    },
-    {
-      id: 3,
-      status: "양호",
-      date: "2025.10.28",
-      restorationStatus: "15자 / 복원 대상 8자",
-      processingTime: "2분 17초",
-      damageLevel: "41%",
-      inspectionStatus: "2자 완료",
-      reliability: "71%",
-    },
-    {
-      id: 2,
-      status: "미흡",
-      date: "2025.10.28",
-      restorationStatus: "203자 / 복원 대상 87자",
-      processingTime: "6분 54초",
-      damageLevel: "70%",
-      inspectionStatus: "23자 완료",
-      reliability: "45%",
-    },
-    {
-      id: 1,
-      status: "미흡",
-      date: "2025.10.28",
-      restorationStatus: "47자 / 복원 대상 29자",
-      processingTime: "4분 33초",
-      damageLevel: "63%",
-      inspectionStatus: "14자 완료",
-      reliability: "52%",
-    },
-  ]);
+  // Mock 데이터를 프론트엔드에서 사용하는 형식으로 변환
+  const [initialData, setInitialData] = useState(
+    mockRubbingList.map((item) => ({
+      id: item.id,
+      status: item.status,
+      date: formatDate(item.created_at),
+      restorationStatus: item.restoration_status || "-",
+      processingTime: formatProcessingTime(item.processing_time),
+      damageLevel: item.damage_level ? `${item.damage_level}%` : "-",
+      inspectionStatus: item.inspection_status || "-",
+      reliability: item.average_reliability ? `${item.average_reliability}%` : "-",
+    }))
+  );
 
   // 메뉴 변경 핸들러 - DetailPage가 열려있으면 닫고 ListPage로 이동
   const handleMenuChange = (menu) => {
@@ -122,11 +53,11 @@ function App() {
       const maxId = prevData.length > 0 ? Math.max(...prevData.map((item) => item.id)) : 0;
       const newId = maxId + 1;
 
-      // 새 항목 생성
+      // 새 항목 생성 (백엔드 응답 형식과 유사하게)
       const newItem = {
         id: newId,
         status: "처리중",
-        date: uploadData.uploadDate,
+        date: uploadData.uploadDate || formatDate(new Date().toISOString()),
         restorationStatus: "-",
         processingTime: "-",
         damageLevel: "-",
