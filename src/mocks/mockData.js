@@ -335,4 +335,3 @@ export const formatProcessingTime = (seconds) => {
   const secs = seconds % 60;
   return `${minutes}분 ${secs}초`;
 };
-
