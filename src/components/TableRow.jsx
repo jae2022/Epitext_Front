@@ -86,7 +86,33 @@ const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
 
             {/* 원본 파일 */}
             <div className="w-[64px]">
-              <button className="text-primary-orange hover:opacity-80 transition-opacity">
+              <button
+                className="text-primary-orange hover:opacity-80 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // 백엔드 API: GET /api/rubbings/:id/download
+                  // 실제 구현 시:
+                  // const response = await apiClient.get(`/api/rubbings/${row.id}/download`, { responseType: 'blob' });
+                  // const url = window.URL.createObjectURL(new Blob([response.data]));
+                  // const link = document.createElement('a');
+                  // link.href = url;
+                  // link.setAttribute('download', row.filename || `rubbing_${row.id}.jpg`);
+                  // document.body.appendChild(link);
+                  // link.click();
+                  // link.remove();
+                  // window.URL.revokeObjectURL(url);
+                  
+                  // 현재는 mock 데이터이므로 이미지 URL로 다운로드 시뮬레이션
+                  if (row.image_url) {
+                    const link = document.createElement('a');
+                    link.href = row.image_url;
+                    link.download = row.filename || `rubbing_${row.id}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }
+                }}
+              >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"

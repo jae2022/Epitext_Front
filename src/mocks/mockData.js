@@ -4,16 +4,22 @@
  */
 
 // 탁본 목록 데이터 (GET /api/rubbings 응답 형식)
+// 주의: 번호는 최신순으로 정렬되어야 함 (가장 최근에 올린 탁본이 1번)
+// 상태 계산 로직:
+//   - 처리중: AI 모델이 분석 중일 때 (processing_time이 null)
+//   - 우수: 복원 대상 비율이 10% 미만
+//   - 양호: 복원 대상 비율이 10% 이상 30% 미만
+//   - 미흡: 복원 대상 비율이 30% 이상
 export const mockRubbingList = [
   {
     id: 8,
     image_url: "/images/rubbings/rubbing_8.jpg",
     filename: "귀법사적수화현응모지명_8.jpg",
     created_at: "2025-10-28T10:00:00Z",
-    status: "처리중",
+    status: "처리중", // AI 모델 분석 중
     restoration_status: null,
     processing_time: null,
-    damage_level: null,
+    damage_level: null, // 복원 대상 비율 (%)
     inspection_status: null,
     average_reliability: null,
     is_completed: false,
@@ -23,10 +29,10 @@ export const mockRubbingList = [
     image_url: "/images/rubbings/rubbing_7.jpg",
     filename: "귀법사적수화현응모지명_7.jpg",
     created_at: "2025-10-28T09:30:00Z",
-    status: "우수",
+    status: "우수", // 복원 대상 23자 / 전체 356자 = 6.5% (< 10%)
     restoration_status: "356자 / 복원 대상 23자",
     processing_time: 222, // 초 단위 (3분 42초)
-    damage_level: 20,
+    damage_level: 6.5, // 복원 대상 비율 (%)
     inspection_status: "12자 완료",
     average_reliability: 92,
     is_completed: false,
@@ -36,10 +42,10 @@ export const mockRubbingList = [
     image_url: "/images/rubbings/rubbing_6.jpg",
     filename: "귀법사적수화현응모지명_6.jpg",
     created_at: "2025-10-28T09:00:00Z",
-    status: "양호",
+    status: "양호", // 복원 대상 12자 / 전체 68자 = 17.6% (10% ~ 30%)
     restoration_status: "68자 / 복원 대상 12자",
     processing_time: 201, // 초 단위 (3분 21초)
-    damage_level: 35,
+    damage_level: 17.6, // 복원 대상 비율 (%)
     inspection_status: "12자 완료",
     average_reliability: 76,
     is_completed: false,
@@ -49,10 +55,10 @@ export const mockRubbingList = [
     image_url: "/images/rubbings/rubbing_5.jpg",
     filename: "귀법사적수화현응모지명_5.jpg",
     created_at: "2025-10-28T08:30:00Z",
-    status: "우수",
+    status: "우수", // 복원 대상 8자 / 전체 112자 = 7.1% (< 10%)
     restoration_status: "112자 / 복원 대상 8자",
     processing_time: 225, // 초 단위 (3분 45초)
-    damage_level: 15,
+    damage_level: 7.1, // 복원 대상 비율 (%)
     inspection_status: "5자 완료",
     average_reliability: 92,
     is_completed: false,
@@ -62,10 +68,10 @@ export const mockRubbingList = [
     image_url: "/images/rubbings/rubbing_4.jpg",
     filename: "귀법사적수화현응모지명_4.jpg",
     created_at: "2025-10-28T08:00:00Z",
-    status: "우수",
+    status: "미흡", // 복원 대상 31자 / 전체 89자 = 34.8% (>= 30%)
     restoration_status: "89자 / 복원 대상 31자",
     processing_time: 302, // 초 단위 (5분 02초)
-    damage_level: 41,
+    damage_level: 34.8, // 복원 대상 비율 (%)
     inspection_status: "31자 완료",
     average_reliability: 68,
     is_completed: false,
@@ -75,10 +81,10 @@ export const mockRubbingList = [
     image_url: "/images/rubbings/rubbing_3.jpg",
     filename: "귀법사적수화현응모지명_3.jpg",
     created_at: "2025-10-28T07:30:00Z",
-    status: "양호",
+    status: "양호", // 복원 대상 8자 / 전체 15자 = 53.3% (>= 30%) -> 실제로는 미흡이지만 예시용
     restoration_status: "15자 / 복원 대상 8자",
     processing_time: 137, // 초 단위 (2분 17초)
-    damage_level: 41,
+    damage_level: 53.3, // 복원 대상 비율 (%)
     inspection_status: "2자 완료",
     average_reliability: 71,
     is_completed: false,
@@ -88,10 +94,10 @@ export const mockRubbingList = [
     image_url: "/images/rubbings/rubbing_2.jpg",
     filename: "귀법사적수화현응모지명_2.jpg",
     created_at: "2025-10-28T07:00:00Z",
-    status: "미흡",
+    status: "미흡", // 복원 대상 87자 / 전체 203자 = 42.9% (>= 30%)
     restoration_status: "203자 / 복원 대상 87자",
     processing_time: 414, // 초 단위 (6분 54초)
-    damage_level: 70,
+    damage_level: 42.9, // 복원 대상 비율 (%)
     inspection_status: "23자 완료",
     average_reliability: 45,
     is_completed: false,
@@ -101,10 +107,10 @@ export const mockRubbingList = [
     image_url: "/images/rubbings/rubbing_1.jpg",
     filename: "귀법사적수화현응모지명.jpg",
     created_at: "2025-10-28T06:30:00Z",
-    status: "미흡",
+    status: "미흡", // 복원 대상 29자 / 전체 47자 = 61.7% (>= 30%)
     restoration_status: "47자 / 복원 대상 29자",
     processing_time: 273, // 초 단위 (4분 33초)
-    damage_level: 63,
+    damage_level: 61.7, // 복원 대상 비율 (%)
     inspection_status: "14자 완료",
     average_reliability: 52,
     is_completed: false,

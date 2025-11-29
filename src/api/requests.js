@@ -21,7 +21,12 @@ export const getRubbingList = async (status = null) => {
   return new Promise((resolve) => {
     setTimeout(() => {
       // Mock 데이터를 프론트엔드에서 사용하는 형식으로 변환
-      const formattedData = mockRubbingList.map((item) => ({
+      // 최신순으로 정렬 (가장 최근에 올린 탁본이 1번이 되도록)
+      const sortedList = [...mockRubbingList].sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+      );
+      
+      const formattedData = sortedList.map((item) => ({
         id: item.id,
         status: item.status,
         date: formatDate(item.created_at),
@@ -31,6 +36,8 @@ export const getRubbingList = async (status = null) => {
         inspectionStatus: item.inspection_status || "-",
         reliability: item.average_reliability ? `${item.average_reliability}%` : "-",
         is_completed: item.is_completed, // 원본 데이터의 is_completed 필드 유지
+        image_url: item.image_url, // 다운로드용
+        filename: item.filename, // 다운로드용
       }));
 
       // status 필터링 (필요한 경우)
