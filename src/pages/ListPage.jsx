@@ -1,24 +1,52 @@
 import React, { useState, useEffect } from "react";
 import TableRow from "../components/TableRow";
+import { getRubbingList } from "../api/requests";
 
-const ListPage = ({ onUploadClick, tableData, completedIds, onComplete, onViewDetail }) => {
+const ListPage = ({ onUploadClick, completedIds, onComplete, onViewDetail, activeMenu }) => {
+  const [rubbings, setRubbings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
 
-  // tableData가 변경될 때 selectAll 상태 업데이트
+  // 탁본 목록 데이터 로드
   useEffect(() => {
-    if (tableData.length === 0) {
+    const loadRubbings = async () => {
+      setIsLoading(true);
+      try {
+        // activeMenu에 따라 status 파라미터 설정
+        let status = null;
+        if (activeMenu === "복원 완료") {
+          status = "복원 완료";
+        } else if (activeMenu === "복원 진행중") {
+          status = "복원 진행중";
+        }
+
+        const data = await getRubbingList(status);
+        setRubbings(data);
+      } catch (error) {
+        console.error("Failed to load rubbings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadRubbings();
+  }, [activeMenu]);
+
+  // rubbings가 변경될 때 selectAll 상태 업데이트
+  useEffect(() => {
+    if (rubbings.length === 0) {
       setSelectAll(false);
     } else {
-      setSelectAll(selectedRows.length === tableData.length && tableData.length > 0);
+      setSelectAll(selectedRows.length === rubbings.length && rubbings.length > 0);
     }
-  }, [selectedRows, tableData]);
+  }, [selectedRows, rubbings]);
 
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedRows([]);
     } else {
-      setSelectedRows(tableData.map((row) => row.id));
+      setSelectedRows(rubbings.map((row) => row.id));
     }
     setSelectAll(!selectAll);
   };
@@ -41,6 +69,15 @@ const ListPage = ({ onUploadClick, tableData, completedIds, onComplete, onViewDe
 
   const isCompleteButtonDisabled = selectedRows.length === 0;
 
+  // 로딩 중일 때 표시
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-auto flex items-center justify-center" style={{ backgroundColor: "#F8F8FA" }}>
+        <div className="text-gray-600">로딩 중...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-auto" style={{ backgroundColor: "#F8F8FA" }}>
       <div className="p-12 min-h-screen" style={{ backgroundColor: "#F8F8FA" }}>
@@ -54,7 +91,7 @@ const ListPage = ({ onUploadClick, tableData, completedIds, onComplete, onViewDe
               <div className="flex items-end gap-2">
                 <span className="text-base font-medium text-gray-600">전체</span>
                 <span className="text-lg font-semibold text-[#ee7542]">
-                  {tableData.length}
+                  {rubbings.length}
                   <span className="text-base text-gray-600 ml-1">건</span>
                 </span>
               </div>
@@ -165,7 +202,7 @@ const ListPage = ({ onUploadClick, tableData, completedIds, onComplete, onViewDe
 
               {/* Table Body */}
               <div>
-                {tableData.map((row, index) => (
+                {rubbings.map((row, index) => (
                   <TableRow
                     key={row.id}
                     row={row}
