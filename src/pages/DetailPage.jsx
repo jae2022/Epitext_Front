@@ -781,11 +781,10 @@ const DetailPage = ({ item, onBack }) => {
           <div
             className="fixed z-50 bg-white rounded-[16px] overflow-hidden"
             style={{
-              height: "968px",
-              left: "500px", // 왼쪽 카드 중앙: 160px (사이드바) + 48px (padding) + 292px (카드 너비 584px의 절반)
-              right: "48px", // AI 복원 대상 검수 카드 오른쪽 끝과 정렬 (padding과 동일)
-              top: "50%",
-              transform: "translateY(-50%)",
+              top: "48px",
+              bottom: "48px",
+              left: "48px",
+              right: "48px",
             }}
           >
             {/* 팝업 헤더 */}
