@@ -18,7 +18,7 @@ function App() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const status = activeMenu === "복원 완료" ? "복원 완료" : activeMenu === "복원 진행중" ? "복원 진행중" : null;
+        const status = activeMenu === "복원 완료" ? "completed" : activeMenu === "복원 진행중" ? "in_progress" : null;
         const data = await getRubbingList(status);
         setInitialData(data);
         setError(null);
@@ -135,7 +135,7 @@ function App() {
     try {
       await completeRubbings(selectedIds);
       // 데이터 새로고침
-      const status = activeMenu === "복원 완료" ? "복원 완료" : activeMenu === "복원 진행중" ? "복원 진행중" : null;
+      const status = activeMenu === "복원 완료" ? "completed" : activeMenu === "복원 진행중" ? "in_progress" : null;
       const data = await getRubbingList(status);
       setInitialData(data);
     } catch (err) {
@@ -157,7 +157,7 @@ function App() {
       setShowUploadPopup(false);
 
       // 데이터 새로고침
-      const status = activeMenu === "복원 완료" ? "복원 완료" : activeMenu === "복원 진행중" ? "복원 진행중" : null;
+      const status = activeMenu === "복원 완료" ? "completed" : activeMenu === "복원 진행중" ? "in_progress" : null;
       const data = await getRubbingList(status);
       setInitialData(data);
     } catch (err) {
@@ -188,6 +188,7 @@ function App() {
               completedIds={[]} // API에서 is_completed로 관리하므로 더 이상 필요 없음
               onComplete={handleComplete}
               onViewDetail={(item) => setSelectedItem(item)}
+              activeMenu={activeMenu}
             />
           )}
           {showUploadPopup && <UploadPopup onClose={() => setShowUploadPopup(false)} onComplete={handleUploadComplete} />}

@@ -16,9 +16,9 @@ const ListPage = ({ onUploadClick, completedIds, onComplete, onViewDetail, activ
         // activeMenu에 따라 status 파라미터 설정
         let status = null;
         if (activeMenu === "복원 완료") {
-          status = "복원 완료";
+          status = "completed";
         } else if (activeMenu === "복원 진행중") {
-          status = "복원 진행중";
+          status = "in_progress";
         }
 
         const data = await getRubbingList(status);
@@ -59,11 +59,30 @@ const ListPage = ({ onUploadClick, completedIds, onComplete, onViewDetail, activ
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (selectedRows.length > 0) {
-      onComplete(selectedRows);
+      await onComplete(selectedRows);
       setSelectedRows([]);
       setSelectAll(false);
+      // 데이터 새로고침
+      const loadRubbings = async () => {
+        setIsLoading(true);
+        try {
+          let status = null;
+          if (activeMenu === "복원 완료") {
+            status = "completed";
+          } else if (activeMenu === "복원 진행중") {
+            status = "in_progress";
+          }
+          const data = await getRubbingList(status);
+          setRubbings(data);
+        } catch (error) {
+          console.error("Failed to load rubbings:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      await loadRubbings();
     }
   };
 
