@@ -1,17 +1,42 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ListPage from "./pages/ListPage";
 import UploadPopup from "./pages/UploadPopup";
 import DetailPage from "./pages/DetailPage";
 import Sidebar from "./components/Sidebar";
+import { getRubbingList, completeRubbings, uploadRubbing } from "./api/requests";
 
 function App() {
   const [showUploadPopup, setShowUploadPopup] = useState(false);
   const [activeMenu, setActiveMenu] = useState("전체 기록");
-  const [completedIds, setCompletedIds] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [initialData, setInitialData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // 샘플 데이터 (state로 관리)
-  const [initialData, setInitialData] = useState([
+  // API에서 데이터 가져오기
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const status = activeMenu === "복원 완료" ? "복원 완료" : activeMenu === "복원 진행중" ? "복원 진행중" : null;
+        const data = await getRubbingList(status);
+        setInitialData(data);
+        setError(null);
+      } catch (err) {
+        console.error("데이터 로딩 실패:", err);
+        setError("데이터를 불러오는데 실패했습니다.");
+        // 에러 발생 시 빈 배열로 설정
+        setInitialData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [activeMenu]);
+
+  // 샘플 데이터 (state로 관리) - 더 이상 사용하지 않음
+  const [sampleData] = useState([
     {
       id: 8,
       status: "처리중",
@@ -100,45 +125,45 @@ function App() {
     setSelectedItem(null); // DetailPage가 열려있으면 닫기
   };
 
-  // 필터링된 데이터
+  // 필터링된 데이터 (API에서 이미 필터링된 데이터를 받아오므로 그대로 사용)
   const getFilteredData = () => {
-    if (activeMenu === "복원 완료") {
-      return initialData.filter((item) => completedIds.includes(item.id));
-    } else if (activeMenu === "복원 진행중") {
-      return initialData.filter((item) => !completedIds.includes(item.id));
-    }
     return initialData;
   };
 
   // 복원 완료 처리
-  const handleComplete = (selectedIds) => {
-    setCompletedIds((prev) => [...prev, ...selectedIds]);
+  const handleComplete = async (selectedIds) => {
+    try {
+      await completeRubbings(selectedIds);
+      // 데이터 새로고침
+      const status = activeMenu === "복원 완료" ? "복원 완료" : activeMenu === "복원 진행중" ? "복원 진행중" : null;
+      const data = await getRubbingList(status);
+      setInitialData(data);
+    } catch (err) {
+      console.error("복원 완료 처리 실패:", err);
+      alert("복원 완료 처리에 실패했습니다.");
+    }
   };
 
-  // 업로드 완료 처리 (새 항목 추가)
-  const handleUploadComplete = (uploadData) => {
-    // 새로운 ID 생성 (기존 최대 ID + 1)
-    setInitialData((prevData) => {
-      const maxId = prevData.length > 0 ? Math.max(...prevData.map((item) => item.id)) : 0;
-      const newId = maxId + 1;
+  // 업로드 완료 처리
+  const handleUploadComplete = async (uploadData) => {
+    try {
+      const file = uploadData.file;
+      if (!file) {
+        alert("파일을 선택해주세요.");
+        return;
+      }
 
-      // 새 항목 생성
-      const newItem = {
-        id: newId,
-        status: "처리중",
-        date: uploadData.uploadDate,
-        restorationStatus: "-",
-        processingTime: "-",
-        damageLevel: "-",
-        inspectionStatus: "-",
-        reliability: "-",
-      };
+      await uploadRubbing(file);
+      setShowUploadPopup(false);
 
-      // 새 항목을 맨 앞에 추가
-      return [newItem, ...prevData];
-    });
-
-    setShowUploadPopup(false);
+      // 데이터 새로고침
+      const status = activeMenu === "복원 완료" ? "복원 완료" : activeMenu === "복원 진행중" ? "복원 진행중" : null;
+      const data = await getRubbingList(status);
+      setInitialData(data);
+    } catch (err) {
+      console.error("업로드 실패:", err);
+      alert("파일 업로드에 실패했습니다.");
+    }
   };
 
   return (
@@ -148,13 +173,23 @@ function App() {
         <DetailPage item={selectedItem} onBack={() => setSelectedItem(null)} />
       ) : (
         <>
-          <ListPage
-            onUploadClick={() => setShowUploadPopup(true)}
-            tableData={getFilteredData()}
-            completedIds={completedIds}
-            onComplete={handleComplete}
-            onViewDetail={(item) => setSelectedItem(item)}
-          />
+          {isLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-gray-500">로딩 중...</div>
+            </div>
+          ) : error ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-red-500">{error}</div>
+            </div>
+          ) : (
+            <ListPage
+              onUploadClick={() => setShowUploadPopup(true)}
+              tableData={getFilteredData()}
+              completedIds={[]} // API에서 is_completed로 관리하므로 더 이상 필요 없음
+              onComplete={handleComplete}
+              onViewDetail={(item) => setSelectedItem(item)}
+            />
+          )}
           {showUploadPopup && <UploadPopup onClose={() => setShowUploadPopup(false)} onComplete={handleUploadComplete} />}
         </>
       )}
