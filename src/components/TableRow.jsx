@@ -101,10 +101,10 @@ const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
                   // link.click();
                   // link.remove();
                   // window.URL.revokeObjectURL(url);
-                  
+
                   // 현재는 mock 데이터이므로 이미지 URL로 다운로드 시뮬레이션
                   if (row.image_url) {
-                    const link = document.createElement('a');
+                    const link = document.createElement("a");
                     link.href = row.image_url;
                     link.download = row.filename || `rubbing_${row.id}.jpg`;
                     document.body.appendChild(link);

@@ -206,9 +206,12 @@ const ReasoningCluster = ({ data, selectedChar, selectedReliability, height = 60
             if (d.data.imgUrl) {
               // 크롭된 탁본 이미지 표시
               const imageGroup = node.append("g").attr("opacity", 0);
-              const clipPath = svg.append("defs").append("clipPath").attr("id", `clip-${d.data.id || "root"}`);
+              const clipPath = svg
+                .append("defs")
+                .append("clipPath")
+                .attr("id", `clip-${d.data.id || "root"}`);
               clipPath.append("circle").attr("r", 24);
-              
+
               imageGroup
                 .append("image")
                 .attr("href", d.data.imgUrl)
@@ -218,7 +221,7 @@ const ReasoningCluster = ({ data, selectedChar, selectedReliability, height = 60
                 .attr("height", 48)
                 .attr("clip-path", `url(#clip-${d.data.id || "root"})`)
                 .attr("preserveAspectRatio", "xMidYMid slice");
-              
+
               imageGroup.transition().delay(0).duration(300).ease(d3.easeCubicInOut).attr("opacity", 1);
             } else {
               // 이미지가 없을 때 "IMG" 텍스트 표시

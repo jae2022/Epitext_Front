@@ -22,10 +22,8 @@ export const getRubbingList = async (status = null) => {
     setTimeout(() => {
       // Mock 데이터를 프론트엔드에서 사용하는 형식으로 변환
       // 최신순으로 정렬 (가장 최근에 올린 탁본이 1번이 되도록)
-      const sortedList = [...mockRubbingList].sort((a, b) => 
-        new Date(b.created_at) - new Date(a.created_at)
-      );
-      
+      const sortedList = [...mockRubbingList].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
       const formattedData = sortedList.map((item) => ({
         id: item.id,
         status: item.status,
@@ -61,4 +59,3 @@ export const getRubbingList = async (status = null) => {
 
 // 하위 호환성을 위한 별칭 (deprecated)
 export const getRubbings = getRubbingList;
-

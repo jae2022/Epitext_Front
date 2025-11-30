@@ -29,7 +29,7 @@ const generateCandidateData = () => {
   const data = {};
   restorationTargets.forEach((target) => {
     const candidates = generateMockCandidates(target.id);
-    
+
     // 전체 후보 데이터 (시각화용)
     data[`${target.id}_all`] = candidates.all.map((c) => ({
       character: c.character,
@@ -38,15 +38,13 @@ const generateCandidateData = () => {
       reliability: `${c.reliability}%`,
       checked: false,
     }));
-    
+
     // 교집합 계산: 획 일치도와 문맥 일치도 둘 다 존재하는 후보
-    const intersection = candidates.all.filter(
-      (c) => c.stroke_match !== null && c.context_match !== null
-    );
-    
+    const intersection = candidates.all.filter((c) => c.stroke_match !== null && c.context_match !== null);
+
     // 교집합을 신뢰도 기준으로 정렬
     const sortedIntersection = [...intersection].sort((a, b) => b.reliability - a.reliability);
-    
+
     // 상위 5개 선택 (5개 미만이면 null로 채움)
     const top5Intersection = [];
     for (let i = 0; i < 5; i++) {
@@ -69,7 +67,7 @@ const generateCandidateData = () => {
         });
       }
     }
-    
+
     data[target.id] = top5Intersection;
   });
   return data;
@@ -657,7 +655,7 @@ const DetailPage = ({ item, onBack }) => {
                                       </div>
                                     );
                                   }
-                                  
+
                                   return (
                                     <div
                                       key={idx}

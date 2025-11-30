@@ -1,6 +1,7 @@
 # 백엔드 구현 가이드
 
 ## 개요
+
 이 문서는 프론트엔드 요구사항에 맞춰 백엔드 및 DB를 구현할 때 필요한 정보를 정리한 것입니다.
 
 ---
@@ -8,6 +9,7 @@
 ## 1. 데이터베이스 구조
 
 ### 1.1 `rubbings` 테이블 (탁본 목록)
+
 ```sql
 CREATE TABLE rubbings (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -31,6 +33,7 @@ CREATE INDEX idx_rubbings_is_completed ON rubbings(is_completed);  -- 필터링�
 ```
 
 ### 1.2 `rubbing_details` 테이블 (탁본 상세 정보)
+
 ```sql
 CREATE TABLE rubbing_details (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -48,6 +51,7 @@ CREATE TABLE rubbing_details (
 ```
 
 ### 1.3 `rubbing_statistics` 테이블 (탁본 통계)
+
 ```sql
 CREATE TABLE rubbing_statistics (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -64,6 +68,7 @@ CREATE TABLE rubbing_statistics (
 ```
 
 ### 1.4 `restoration_targets` 테이블 (복원 대상 글자)
+
 ```sql
 CREATE TABLE restoration_targets (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -83,6 +88,7 @@ CREATE TABLE restoration_targets (
 ```
 
 ### 1.5 `candidates` 테이블 (후보 한자)
+
 ```sql
 CREATE TABLE candidates (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -100,6 +106,7 @@ CREATE TABLE candidates (
 ```
 
 ### 1.6 `inspection_records` 테이블 (검수 기록)
+
 ```sql
 CREATE TABLE inspection_records (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -120,22 +127,23 @@ CREATE TABLE inspection_records (
 ## 2. 상태 계산 로직
 
 ### 2.1 상태 결정 규칙
+
 ```python
 def calculate_status(processing_time, damage_level):
     """
     상태 계산 로직
-    
+
     Args:
         processing_time: AI 모델 처리 시간 (초 단위, None이면 처리 중)
         damage_level: 복원 대상 비율 (%)
-    
+
     Returns:
         "처리중" | "우수" | "양호" | "미흡"
     """
     # 처리 중인 경우
     if processing_time is None:
         return "처리중"
-    
+
     # 복원 대상 비율에 따라 상태 결정
     if damage_level < 10:
         return "우수"      # 10% 미만
@@ -146,21 +154,22 @@ def calculate_status(processing_time, damage_level):
 ```
 
 ### 2.2 복원 대상 비율 계산
+
 ```python
 def calculate_damage_level(total_characters, restoration_targets):
     """
     복원 대상 비율 계산
-    
+
     Args:
         total_characters: 전체 글자 수
         restoration_targets: 복원 대상 글자 수
-    
+
     Returns:
         복원 대상 비율 (%)
     """
     if total_characters == 0:
         return 0.0
-    
+
     return (restoration_targets / total_characters) * 100
 ```
 
@@ -169,6 +178,7 @@ def calculate_damage_level(total_characters, restoration_targets):
 ## 3. API 엔드포인트
 
 ### 3.1 탁본 목록 조회
+
 ```
 GET /api/rubbings
 Query Parameters:
@@ -201,6 +211,7 @@ Response: Array<RubbingListItem>
 ```
 
 ### 3.2 탁본 원본 파일 다운로드
+
 ```
 GET /api/rubbings/:id/download
 
@@ -213,7 +224,7 @@ def download_rubbing(rubbing_id):
     rubbing = Rubbing.query.get(rubbing_id)
     if not rubbing:
         return {"error": "Rubbing not found"}, 404
-    
+
     return send_file(
         rubbing.image_url,
         as_attachment=True,
@@ -222,6 +233,7 @@ def download_rubbing(rubbing_id):
 ```
 
 ### 3.3 탁본 상세 정보 조회
+
 ```
 GET /api/rubbings/:id
 
@@ -255,6 +267,7 @@ Response: RubbingDetail
 ```
 
 ### 3.4 탁본 통계 조회
+
 ```
 GET /api/rubbings/:id/statistics
 
@@ -270,6 +283,7 @@ Response: RubbingStatistics
 ```
 
 ### 3.5 복원 대상 목록 조회
+
 ```
 GET /api/rubbings/:id/restoration-targets
 
@@ -287,6 +301,7 @@ Response: Array<RestorationTarget>
 ```
 
 ### 3.6 후보 한자 목록 조회
+
 ```
 GET /api/rubbings/:id/targets/:targetId/candidates
 
@@ -315,6 +330,7 @@ Candidate 구조:
 ```
 
 ### 3.7 유추 근거 데이터 조회
+
 ```
 GET /api/rubbings/:id/targets/:targetId/reasoning
 
@@ -331,6 +347,7 @@ Response: {
 ```
 
 ### 3.7.1 복원 대상 글자 크롭 이미지 조회 (별도 엔드포인트)
+
 ```
 GET /api/rubbings/:id/targets/:targetId/cropped-image
 
@@ -341,19 +358,20 @@ Content-Type: image/jpeg
 @app.route('/api/rubbings/<int:rubbing_id>/targets/<int:target_id>/cropped-image')
 def get_cropped_image(rubbing_id, target_id):
     target = RestorationTarget.query.filter_by(
-        id=target_id, 
+        id=target_id,
         rubbing_id=rubbing_id
     ).first()
-    
+
     if not target:
         return {"error": "Target not found"}, 404
-    
+
     # 크롭된 이미지 경로 반환
     cropped_image_path = f"/images/rubbings/cropped/rubbing_{rubbing_id}_target_{target_id}.jpg"
     return send_file(cropped_image_path, mimetype='image/jpeg')
 ```
 
 ### 3.8 검수 상태 조회
+
 ```
 GET /api/rubbings/:id/inspection-status
 
@@ -374,6 +392,7 @@ Response: {
 ```
 
 ### 3.9 탁본 이미지 업로드
+
 ```
 POST /api/rubbings/upload
 Content-Type: multipart/form-data
@@ -397,6 +416,7 @@ Response: {
 ```
 
 ### 3.10 검수 결과 저장
+
 ```
 POST /api/rubbings/:id/targets/:targetId/inspect
 Content-Type: application/json
@@ -418,6 +438,7 @@ Response: {
 ```
 
 ### 3.11 복원 완료 처리
+
 ```
 POST /api/rubbings/complete
 Content-Type: application/json
@@ -441,11 +462,13 @@ Response: {
 ## 4. 백엔드 구현 시 주의사항
 
 ### 4.1 번호 표시
+
 - **프론트엔드에서 번호는 최신순으로 정렬된 리스트의 인덱스 + 1로 표시**
 - 백엔드에서 `created_at DESC`로 정렬하여 반환하면 됨
 - 예: 가장 최근에 올린 탁본이 첫 번째 → 프론트엔드에서 1번으로 표시
 
 ### 4.2 상태 자동 계산
+
 - AI 모델 처리 완료 후 자동으로 상태 계산
 - `damage_level` (복원 대상 비율)을 기준으로:
   - 10% 미만: "우수"
@@ -454,15 +477,18 @@ Response: {
 - 처리 중일 때는 `processing_time`이 null이므로 "처리중"
 
 ### 4.3 복원 현황 포맷
+
 - `restoration_status` 필드는 "전체글자수자 / 복원 대상 X자" 형식
 - 예: "356자 / 복원 대상 23자"
 
 ### 4.4 검수 현황 포맷
+
 - `inspection_status` 필드는 "X자 완료" 형식
 - 예: "12자 완료"
 - `inspection_records` 테이블에서 해당 `rubbing_id`의 레코드 수를 세어서 계산
 
 ### 4.5 평균 신뢰도 계산
+
 - `average_reliability`는 검수한 글자들의 신뢰도 평균
 - `inspection_records` 테이블에서 해당 `rubbing_id`의 `reliability` 평균 계산
 - 검수 현황 카드에는 다음 통계가 표시됨:
@@ -472,26 +498,31 @@ Response: {
   - 최저 신뢰도: 검수한 글자들의 신뢰도 최소값
 
 ### 4.6 탁본 손상 정도
+
 - `damage_level`은 복원 대상 비율 (%)
 - 상태 계산 기준과 동일한 값
 
 ### 4.7 처리 시간
+
 - `processing_time`은 AI 모델이 처리하는데 걸린 시간 (초 단위)
 - 프론트엔드에서 "X분 Y초" 형식으로 변환
 
 ### 4.8 복원 완료 필터링
+
 - `is_completed` 필드로 복원 완료 여부 관리
 - "복원 완료" 페이지: `is_completed = true`
 - "복원 진행중" 페이지: `is_completed = false`
 - "전체 기록" 페이지: 전체 조회
 
 ### 4.9 구두점 복원 모델
+
 - OCR 결과(`text_content`)에 구두점 복원 모델을 적용하여 `text_content_with_punctuation` 생성
 - 구두점 복원 모델은 쉼표(，), 마침표(。), 줄바꿈 등을 추가
 - 프론트엔드에서는 `text_content_with_punctuation`를 사용하여 텍스트 표시
 - 구두점에 따라 줄바꿈이 자연스럽게 이루어짐
 
 ### 4.10 교집합 처리 (검수 대상 추천 한자)
+
 - 검수 대상 추천 한자 표에는 획 일치도와 문맥 일치도 둘 다 존재하는 후보만 표시
 - 교집합 계산:
   ```python
@@ -502,11 +533,13 @@ Response: {
 - null 값 예시: `{ "character": null, "stroke_match": null, "context_match": null, "reliability": null }`
 
 ### 4.11 폰트 타입 분석
+
 - 폰트 타입은 전서, 예서, 해서, 행서, 초서 중 분석 결과에 따라 여러개 가능
 - `font_types` 필드는 JSON 배열 형식: `["행서체", "전서체"]`
 - 프론트엔드에서 태그로 표시됨
 
 ### 4.12 탁본 이미지 크롭 (유추 근거 cluster용)
+
 - AI 모델 처리 시 각 복원 대상 글자 부분을 탁본 이미지에서 크롭하여 저장
 - 크롭 영역은 `row_index`와 `char_index`를 기반으로 계산
 - 크롭된 이미지는 `/images/rubbings/cropped/rubbing_{rubbing_id}_target_{target_id}.jpg` 형식으로 저장
@@ -519,6 +552,7 @@ Response: {
 ## 5. 데이터 흐름
 
 ### 5.1 탁본 업로드 → 처리 완료
+
 ```
 1. 사용자가 탁본 이미지 업로드
    → POST /api/rubbings/upload
@@ -542,6 +576,7 @@ Response: {
 ```
 
 ### 5.2 검수 진행
+
 ```
 1. 사용자가 상세 페이지에서 후보 한자 선택
    → POST /api/rubbings/:id/targets/:targetId/inspect
@@ -558,6 +593,7 @@ Response: {
 ```
 
 ### 5.3 복원 완료 처리
+
 ```
 1. 사용자가 목록에서 체크박스 선택 후 "복원 완료" 버튼 클릭
    → POST /api/rubbings/complete
@@ -589,6 +625,7 @@ INSERT INTO rubbings (id, image_url, filename, created_at, status, restoration_s
 ## 7. 환경 변수
 
 프론트엔드에서 사용하는 API Base URL:
+
 ```
 VITE_API_BASE_URL=http://localhost:8000  # 개발 환경
 VITE_API_BASE_URL=https://api.epitext.com  # 프로덕션 환경
@@ -608,6 +645,7 @@ VITE_API_BASE_URL=https://api.epitext.com  # 프로덕션 환경
 ```
 
 HTTP 상태 코드:
+
 - 200: 성공
 - 400: 잘못된 요청
 - 404: 리소스를 찾을 수 없음
@@ -616,4 +654,3 @@ HTTP 상태 코드:
 ---
 
 이 가이드를 참고하여 백엔드를 구현하면 프론트엔드와 원활하게 연동할 수 있습니다.
-
