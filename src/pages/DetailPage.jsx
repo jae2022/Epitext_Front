@@ -275,11 +275,16 @@ const DetailPage = ({ item, onBack }) => {
               <h2 className="text-lg font-semibold text-gray-800 mb-4">탁본 정보</h2>
               <div className="flex gap-6">
                 <div className="w-[238px] h-[187px] bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                  {rubbingDetail.image_url ? (
-                    <img src={rubbingDetail.image_url} alt={rubbingDetail.filename} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-gray-400">이미지</span>
-                  )}
+                  <img
+                    src="/귀법사적소수좌현응묘지명.png"
+                    alt="탁본 이미지"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      // 이미지 로드 실패 시 대체 텍스트 표시
+                      e.target.style.display = "none";
+                      e.target.parentElement.innerHTML = '<span class="text-gray-400">이미지</span>';
+                    }}
+                  />
                 </div>
                 <div className="flex-1">
                   <div className="mb-4">
@@ -293,7 +298,7 @@ const DetailPage = ({ item, onBack }) => {
                         marginBottom: "8px",
                       }}
                     >
-                      파일명: {rubbingDetail.filename}
+                      파일명: 귀법사적소수좌현응묘지명.jpg
                     </p>
                     <div
                       style={{
@@ -740,11 +745,10 @@ const DetailPage = ({ item, onBack }) => {
           <div
             className="fixed z-50 bg-white rounded-[16px] overflow-hidden"
             style={{
-              height: "968px",
-              left: "500px", // 왼쪽 카드 중앙: 160px (사이드바) + 48px (padding) + 292px (카드 너비 584px의 절반)
-              right: "48px", // AI 복원 대상 검수 카드 오른쪽 끝과 정렬 (padding과 동일)
-              top: "50%",
-              transform: "translateY(-50%)",
+              top: "48px",
+              bottom: "48px",
+              left: "48px",
+              right: "48px",
             }}
           >
             {/* 팝업 헤더 */}

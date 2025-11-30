@@ -1,5 +1,26 @@
 import apiClient from "./client";
-import { mockRubbingList, formatDate, formatProcessingTime } from "../mocks/mockData";
+
+/**
+ * 날짜 포맷팅 (YYYY-MM-DD -> YYYY.MM.DD)
+ */
+const formatDate = (dateString) => {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}.${month}.${day}`;
+};
+
+/**
+ * 처리 시간 포맷팅 (초 -> X분 Y초)
+ */
+const formatProcessingTime = (seconds) => {
+  if (!seconds) return "-";
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${minutes}분 ${secs}초`;
+};
 
 /**
  * 탁본 목록 조회
@@ -7,55 +28,194 @@ import { mockRubbingList, formatDate, formatProcessingTime } from "../mocks/mock
  * @returns {Promise} 탁본 목록 데이터
  */
 export const getRubbingList = async (status = null) => {
-  // TODO: 백엔드 API 연결 시 주석 해제
-  // try {
-  //   const params = status ? { status } : {};
-  //   const response = await apiClient.get("/api/rubbings", { params });
-  //   return response.data;
-  // } catch (error) {
-  //   console.error("Failed to fetch rubbings:", error);
-  //   throw error;
-  // }
+  try {
+    const params = status ? { status } : {};
+    const response = await apiClient.get("/api/rubbings", { params });
 
-  // 더미 데이터로 테스트 (1초 딜레이 시뮬레이션)
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Mock 데이터를 프론트엔드에서 사용하는 형식으로 변환
-      // 최신순으로 정렬 (가장 최근에 올린 탁본이 1번이 되도록)
-      const sortedList = [...mockRubbingList].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // 백엔드 응답을 프론트엔드 형식으로 변환
+    const formattedData = response.data.map((item) => ({
+      id: item.id,
+      status: item.status,
+      date: formatDate(item.created_at),
+      restorationStatus: item.restoration_status || "-",
+      processingTime: formatProcessingTime(item.processing_time),
+      damageLevel: item.damage_level ? `${item.damage_level}%` : "-",
+      inspectionStatus: item.inspection_status || "-",
+      reliability: item.average_reliability ? `${item.average_reliability}%` : "-",
+      is_completed: item.is_completed,
+      image_url: item.image_url,
+      filename: item.filename,
+    }));
 
-      const formattedData = sortedList.map((item) => ({
-        id: item.id,
-        status: item.status,
-        date: formatDate(item.created_at),
-        restorationStatus: item.restoration_status || "-",
-        processingTime: formatProcessingTime(item.processing_time),
-        damageLevel: item.damage_level ? `${item.damage_level}%` : "-",
-        inspectionStatus: item.inspection_status || "-",
-        reliability: item.average_reliability ? `${item.average_reliability}%` : "-",
-        is_completed: item.is_completed, // 원본 데이터의 is_completed 필드 유지
-        image_url: item.image_url, // 다운로드용
-        filename: item.filename, // 다운로드용
-      }));
-
-      // status 필터링 (필요한 경우)
-      const filteredData = status
-        ? formattedData.filter((item) => {
-            if (status === "복원 완료") {
-              // is_completed가 true인 항목만
-              return item.is_completed === true;
-            } else if (status === "복원 진행중") {
-              // is_completed가 false인 모든 항목 (처리중, 우수, 양호, 미흡 등 모두 포함)
-              return item.is_completed === false;
-            }
-            return true;
-          })
-        : formattedData;
-
-      resolve(filteredData);
-    }, 1000); // 1초 딜레이
-  });
+    return formattedData;
+  } catch (error) {
+    console.error("Failed to fetch rubbings:", error);
+    throw error;
+  }
 };
 
-// 하위 호환성을 위한 별칭 (deprecated)
-export const getRubbings = getRubbingList;
+/**
+ * 탁본 상세 정보 조회
+ * @param {number} id - 탁본 ID
+ * @returns {Promise} 탁본 상세 정보
+ */
+export const getRubbingDetail = async (id) => {
+  try {
+    const response = await apiClient.get(`/api/rubbings/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch rubbing detail:", error);
+    throw error;
+  }
+};
+
+/**
+ * 탁본 통계 조회
+ * @param {number} id - 탁본 ID
+ * @returns {Promise} 탁본 통계 정보
+ */
+export const getRubbingStatistics = async (id) => {
+  try {
+    const response = await apiClient.get(`/api/rubbings/${id}/statistics`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch rubbing statistics:", error);
+    throw error;
+  }
+};
+
+/**
+ * 복원 대상 목록 조회
+ * @param {number} id - 탁본 ID
+ * @returns {Promise} 복원 대상 목록
+ */
+export const getRestorationTargets = async (id) => {
+  try {
+    const response = await apiClient.get(`/api/rubbings/${id}/restoration-targets`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch restoration targets:", error);
+    throw error;
+  }
+};
+
+/**
+ * 후보 한자 목록 조회
+ * @param {number} rubbingId - 탁본 ID
+ * @param {number} targetId - 복원 대상 ID
+ * @returns {Promise} 후보 한자 목록
+ */
+export const getCandidates = async (rubbingId, targetId) => {
+  try {
+    const response = await apiClient.get(`/api/rubbings/${rubbingId}/targets/${targetId}/candidates`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch candidates:", error);
+    throw error;
+  }
+};
+
+/**
+ * 유추 근거 데이터 조회
+ * @param {number} rubbingId - 탁본 ID
+ * @param {number} targetId - 복원 대상 ID
+ * @returns {Promise} 유추 근거 데이터
+ */
+export const getReasoning = async (rubbingId, targetId) => {
+  try {
+    const response = await apiClient.get(`/api/rubbings/${rubbingId}/targets/${targetId}/reasoning`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch reasoning:", error);
+    throw error;
+  }
+};
+
+/**
+ * 검수 결과 저장
+ * @param {number} rubbingId - 탁본 ID
+ * @param {number} targetId - 복원 대상 ID
+ * @param {string} selectedCharacter - 선택된 한자
+ * @param {number} selectedCandidateId - 선택된 후보 ID
+ * @returns {Promise} 검수 결과
+ */
+export const inspectTarget = async (rubbingId, targetId, selectedCharacter, selectedCandidateId) => {
+  try {
+    const response = await apiClient.post(`/api/rubbings/${rubbingId}/targets/${targetId}/inspect`, {
+      selected_character: selectedCharacter,
+      selected_candidate_id: selectedCandidateId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to inspect target:", error);
+    throw error;
+  }
+};
+
+/**
+ * 복원 완료 처리
+ * @param {number[]} selectedIds - 복원 완료할 탁본 ID 배열
+ * @returns {Promise} 처리 결과
+ */
+export const completeRubbings = async (selectedIds) => {
+  try {
+    const response = await apiClient.post("/api/rubbings/complete", {
+      selected_ids: selectedIds,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to complete rubbings:", error);
+    throw error;
+  }
+};
+
+/**
+ * 탁본 이미지 업로드
+ * @param {File} file - 업로드할 이미지 파일
+ * @returns {Promise} 업로드 결과
+ */
+export const uploadRubbing = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await apiClient.post("/api/rubbings/upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to upload rubbing:", error);
+    throw error;
+  }
+};
+
+/**
+ * 탁본 원본 파일 다운로드
+ * @param {number} id - 탁본 ID
+ * @param {string} filename - 다운로드할 파일명
+ * @returns {Promise} 다운로드 결과
+ */
+export const downloadRubbing = async (id, filename) => {
+  try {
+    const response = await apiClient.get(`/api/rubbings/${id}/download`, {
+      responseType: "blob", // 파일 다운로드를 위해 blob 타입 사용
+    });
+
+    // Blob을 다운로드 링크로 변환
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to download rubbing:", error);
+    throw error;
+  }
+};

@@ -100,6 +100,7 @@ const UploadPopup = ({ onClose, onComplete }) => {
       onComplete({
         fileName: uploadedFile.name,
         uploadDate: dateString,
+        file: uploadedFile, // 파일 객체도 함께 전달
       });
     }
     onClose();

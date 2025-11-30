@@ -1,4 +1,5 @@
 import React from "react";
+import { downloadRubbing } from "../api/requests";
 
 const StatusBadge = ({ status }) => {
   const statusConfig = {
@@ -51,7 +52,19 @@ const ActionButton = ({ type, disabled = false, status, borderColor = "#fafbfd",
 };
 
 const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
-  const { id, status, date, restorationStatus, processingTime, damageLevel, inspectionStatus, reliability } = row;
+  const { id, status, date, restorationStatus, processingTime, damageLevel, inspectionStatus, reliability, filename } = row;
+
+  // 원본 파일 다운로드 핸들러
+  const handleDownload = async (e) => {
+    e.stopPropagation(); // 행 클릭 이벤트 방지
+    try {
+      const downloadFilename = filename || `rubbing_${id}.jpg`;
+      await downloadRubbing(id, downloadFilename);
+    } catch (err) {
+      console.error("다운로드 실패:", err);
+      alert("파일 다운로드에 실패했습니다.");
+    }
+  };
 
   // 탁본 복원 버튼 비활성화할 ID 목록 (7, 5, 3, 2)
   const disabledRestoreIds = [7, 5, 3, 2];
@@ -87,31 +100,9 @@ const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
             {/* 원본 파일 */}
             <div className="w-[64px]">
               <button
-                className="text-primary-orange hover:opacity-80 transition-opacity"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // 백엔드 API: GET /api/rubbings/:id/download
-                  // 실제 구현 시:
-                  // const response = await apiClient.get(`/api/rubbings/${row.id}/download`, { responseType: 'blob' });
-                  // const url = window.URL.createObjectURL(new Blob([response.data]));
-                  // const link = document.createElement('a');
-                  // link.href = url;
-                  // link.setAttribute('download', row.filename || `rubbing_${row.id}.jpg`);
-                  // document.body.appendChild(link);
-                  // link.click();
-                  // link.remove();
-                  // window.URL.revokeObjectURL(url);
-
-                  // 현재는 mock 데이터이므로 이미지 URL로 다운로드 시뮬레이션
-                  if (row.image_url) {
-                    const link = document.createElement("a");
-                    link.href = row.image_url;
-                    link.download = row.filename || `rubbing_${row.id}.jpg`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  }
-                }}
+                onClick={handleDownload}
+                className="text-primary-orange hover:opacity-80 transition-opacity cursor-pointer"
+                title="원본 파일 다운로드"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path
