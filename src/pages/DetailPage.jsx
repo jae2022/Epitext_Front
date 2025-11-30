@@ -11,8 +11,14 @@ import {
 
 // 복원 대상 글자 위치 데이터 생성 (mockRestorationTargets를 사용하되, 기존 형식과 호환되도록 변환)
 const generateRestorationTargets = () => {
-  // mockRestorationTargets를 기존 형식으로 변환
-  return mockRestorationTargets.map((target) => ({
+  // mockRestorationTargets는 함수이므로 호출해야 함
+  const targets =
+    typeof mockRestorationTargets === "function"
+      ? mockRestorationTargets(mockRubbingDetail.text_content_with_punctuation || mockRubbingDetail.text_content)
+      : mockRestorationTargets;
+
+  // 기존 형식으로 변환
+  return targets.map((target) => ({
     id: target.id,
     position: target.position,
     row: target.row_index,
@@ -28,47 +34,108 @@ const restorationTargets = generateRestorationTargets();
 const generateCandidateData = () => {
   const data = {};
   restorationTargets.forEach((target) => {
-    const candidates = generateMockCandidates(target.id);
+    try {
+      const candidates = generateMockCandidates(target.id);
 
-    // 전체 후보 데이터 (시각화용)
-    data[`${target.id}_all`] = candidates.all.map((c) => ({
-      character: c.character,
-      strokeMatch: c.stroke_match,
-      contextMatch: c.context_match,
-      reliability: `${c.reliability}%`,
-      checked: false,
-    }));
+      // candidates가 없거나 all이 없으면 빈 배열로 처리
+      if (!candidates || !candidates.all || candidates.all.length === 0) {
+        // 빈 후보 배열 생성 (5개 null로 채움)
+        data[target.id] = Array(5)
+          .fill(null)
+          .map(() => ({
+            character: null,
+            strokeMatch: null,
+            contextMatch: null,
+            reliability: null,
+            checked: false,
+          }));
+        data[`${target.id}_all`] = [];
+        return;
+      }
 
-    // 교집합 계산: 획 일치도와 문맥 일치도 둘 다 존재하는 후보
-    const intersection = candidates.all.filter((c) => c.stroke_match !== null && c.context_match !== null);
+      // 전체 후보 데이터 (시각화용)
+      data[`${target.id}_all`] = candidates.all.map((c) => ({
+        character: c.character,
+        strokeMatch: c.stroke_match,
+        contextMatch: c.context_match,
+        reliability: `${c.reliability}%`,
+        checked: false,
+      }));
 
-    // 교집합을 신뢰도 기준으로 정렬
-    const sortedIntersection = [...intersection].sort((a, b) => b.reliability - a.reliability);
+      // 교집합 계산: 획 일치도와 문맥 일치도 둘 다 존재하는 후보
+      const intersection = candidates.all.filter((c) => c.stroke_match !== null && c.context_match !== null);
 
-    // 상위 5개 선택 (5개 미만이면 null로 채움)
-    const top5Intersection = [];
-    for (let i = 0; i < 5; i++) {
-      if (i < sortedIntersection.length) {
-        top5Intersection.push({
-          character: sortedIntersection[i].character,
-          strokeMatch: sortedIntersection[i].stroke_match,
-          contextMatch: sortedIntersection[i].context_match,
-          reliability: `${sortedIntersection[i].reliability}%`,
-          checked: false,
-        });
+      const top5Intersection = [];
+
+      if (intersection.length > 0) {
+        // 교집합이 있는 경우: F1 Score(전체 신뢰도) 기준으로 정렬
+        const sortedIntersection = [...intersection].sort((a, b) => b.reliability - a.reliability);
+
+        // 상위 5개 선택 (5개 미만이면 null로 채움)
+        for (let i = 0; i < 5; i++) {
+          if (i < sortedIntersection.length) {
+            top5Intersection.push({
+              character: sortedIntersection[i].character,
+              strokeMatch: sortedIntersection[i].stroke_match,
+              contextMatch: sortedIntersection[i].context_match,
+              reliability: `${sortedIntersection[i].reliability}%`, // F1 Score
+              checked: false,
+            });
+          } else {
+            // null로 채움
+            top5Intersection.push({
+              character: null,
+              strokeMatch: null,
+              contextMatch: null,
+              reliability: null,
+              checked: false,
+            });
+          }
+        }
       } else {
-        // null로 채움
-        top5Intersection.push({
+        // 교집합이 없는 경우: 문맥 일치도만 있는 후보들을 문맥 일치도 기준으로 정렬
+        const contextOnly = candidates.all
+          .filter((c) => c.stroke_match === null && c.context_match !== null)
+          .sort((a, b) => b.context_match - a.context_match);
+
+        // 상위 5개 선택 (5개 미만이면 null로 채움)
+        for (let i = 0; i < 5; i++) {
+          if (i < contextOnly.length) {
+            top5Intersection.push({
+              character: contextOnly[i].character,
+              strokeMatch: null, // 획 일치도 없음
+              contextMatch: contextOnly[i].context_match,
+              reliability: `${contextOnly[i].context_match}%`, // 문맥 일치도가 전체 신뢰도
+              checked: false,
+            });
+          } else {
+            // null로 채움
+            top5Intersection.push({
+              character: null,
+              strokeMatch: null,
+              contextMatch: null,
+              reliability: null,
+              checked: false,
+            });
+          }
+        }
+      }
+
+      data[target.id] = top5Intersection;
+    } catch (error) {
+      console.error(`Error generating candidates for target ${target.id}:`, error);
+      // 에러 발생 시 빈 후보 배열 생성
+      data[target.id] = Array(5)
+        .fill(null)
+        .map(() => ({
           character: null,
           strokeMatch: null,
           contextMatch: null,
           reliability: null,
           checked: false,
-        });
-      }
+        }));
+      data[`${target.id}_all`] = [];
     }
-
-    data[target.id] = top5Intersection;
   });
   return data;
 };
@@ -537,7 +604,7 @@ const DetailPage = ({ item, onBack }) => {
                   {sampleText.map((text, rowIndex) => {
                     const targetsInRow = targetsByRow[rowIndex] || [];
                     const selectedTargetInRow = targetsInRow.find((t) => t.id === selectedCharId);
-                    const showTable = selectedTargetInRow && candidates[selectedCharId];
+                    const showTable = selectedTargetInRow && candidates[selectedCharId] && candidates[selectedCharId].length > 0;
 
                     return (
                       <div key={rowIndex}>
@@ -640,7 +707,7 @@ const DetailPage = ({ item, onBack }) => {
                               </div>
                               {/* 테이블 바디 */}
                               <div>
-                                {candidates[selectedCharId].map((candidate, idx) => {
+                                {(candidates[selectedCharId] || []).map((candidate, idx) => {
                                   // null 값 처리 (교집합이 5개 미만일 때)
                                   if (candidate.character === null) {
                                     return (
