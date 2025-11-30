@@ -304,7 +304,7 @@ const ReasoningCluster = ({ data, selectedChar, selectedReliability, height = 60
                 .attr("opacity", selectedChar ? 0.3 : 0.6);
             }
 
-            const labelText = `${d.data.name} ${Math.round(d.data.score * 100)}%`;
+            const labelText = `${d.data.name} ${(d.data.score * 100).toFixed(1)}%`;
 
             // 첫 번째 텍스트 (Halo 역할 - 배경 가림용, 애니메이션 적용)
             const haloText = node
