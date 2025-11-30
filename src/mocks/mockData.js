@@ -118,6 +118,8 @@ export const mockRubbingList = [
 ];
 
 // 탁본 상세 정보 데이터 (GET /api/rubbings/:id 응답 형식)
+// text_content: OCR 결과 (구두점 복원 전)
+// text_content_with_punctuation: 구두점 복원 모델 적용 후 (쉼표, 마침표 등 포함, 줄바꿈 정보 포함)
 export const mockRubbingDetail = {
   id: 1,
   image_url: "/images/rubbings/rubbing_1.jpg",
@@ -149,7 +151,35 @@ export const mockRubbingDetail = {
     "壬申茶□以三月□五日",
     "□□歲下元己未二月十",
   ],
-  font_types: ["행서체", "전서체"],
+  // 구두점 복원 모델 적용 후 텍스트 (쉼표, 마침표 등 포함, 줄바꿈 정보 포함)
+  text_content_with_punctuation: [
+    "高□洛□歸法寺住持，",
+    "見性寂炤首□玄應者。",
+    "立□第十五□肅宗□子，",
+    "□□歲下元己未二月十。",
+    "□日甲子薨卒二十一日，",
+    "壬申茶□以三月□五日。",
+    "乙酉□舍利□於八德□，",
+    "□□歲下元己未二月十。",
+    "□日甲子薨卒二十一日，",
+    "壬申茶□以三月□五日。",
+    "乙酉□舍利□於八德□，",
+    "□□歲下元己未二月十。",
+    "□日甲子薨卒二十一日，",
+    "壬申茶□以三月□五日。",
+    "乙酉□舍利□於八德□，",
+    "□□歲下元己未二月十。",
+    "□日甲子薨卒二十一日，",
+    "壬申茶□以三月□五日。",
+    "高□洛□歸法寺住持，",
+    "見性□炤首□玄應者。",
+    "立□□十五□肅宗□子，",
+    "□□歲下元己未二月十。",
+    "□日甲子薨卒二十一日，",
+    "壬申茶□以三月□五日。",
+    "□□歲下元己未二月十。",
+  ],
+  font_types: ["행서체", "전서체"], // 전서, 예서, 해서, 행서, 초서 중 여러개 가능
   damage_percentage: 31.6,
   processed_at: "2025-10-28T16:23:00Z",
   total_processing_time: 222, // 초 단위
@@ -299,7 +329,8 @@ export const mockInspectionStatus = {
 };
 
 // 유추 근거 데이터 (GET /api/rubbings/:id/targets/:targetId/reasoning 응답 형식)
-export const generateMockReasoningData = (targetId) => {
+// imgUrl: 탁본 이미지에서 해당 글자 부분을 크롭한 이미지 URL (백엔드에서 제공)
+export const generateMockReasoningData = (targetId, rubbingId = 1) => {
   const candidates = generateMockCandidates(targetId).all;
 
   // Vision 모델 후보 (획 일치도 기준)
@@ -320,6 +351,7 @@ export const generateMockReasoningData = (targetId) => {
     }));
 
   return {
+    imgUrl: `/images/rubbings/cropped/rubbing_${rubbingId}_target_${targetId}.jpg`, // 크롭된 이미지 URL (백엔드에서 제공)
     vision: visionCandidates,
     nlp: nlpCandidates,
   };

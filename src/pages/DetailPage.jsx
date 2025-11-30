@@ -23,18 +23,14 @@ const generateRestorationTargets = () => {
 const restorationTargets = generateRestorationTargets();
 
 // 후보 데이터 생성 (mockData의 generateMockCandidates 사용)
+// 교집합 처리: 획 일치도와 문맥 일치도 둘 다 존재하는 후보만 표시
+// 교집합이 5개 미만일 경우 null로 채워서 항상 5개 유지
 const generateCandidateData = () => {
   const data = {};
   restorationTargets.forEach((target) => {
     const candidates = generateMockCandidates(target.id);
-    // 기존 형식과 호환되도록 변환 (checked 필드 추가, reliability를 문자열로)
-    data[target.id] = candidates.top5.map((c) => ({
-      character: c.character,
-      strokeMatch: c.stroke_match,
-      contextMatch: c.context_match,
-      reliability: `${c.reliability}%`,
-      checked: false,
-    }));
+    
+    // 전체 후보 데이터 (시각화용)
     data[`${target.id}_all`] = candidates.all.map((c) => ({
       character: c.character,
       strokeMatch: c.stroke_match,
@@ -42,6 +38,39 @@ const generateCandidateData = () => {
       reliability: `${c.reliability}%`,
       checked: false,
     }));
+    
+    // 교집합 계산: 획 일치도와 문맥 일치도 둘 다 존재하는 후보
+    const intersection = candidates.all.filter(
+      (c) => c.stroke_match !== null && c.context_match !== null
+    );
+    
+    // 교집합을 신뢰도 기준으로 정렬
+    const sortedIntersection = [...intersection].sort((a, b) => b.reliability - a.reliability);
+    
+    // 상위 5개 선택 (5개 미만이면 null로 채움)
+    const top5Intersection = [];
+    for (let i = 0; i < 5; i++) {
+      if (i < sortedIntersection.length) {
+        top5Intersection.push({
+          character: sortedIntersection[i].character,
+          strokeMatch: sortedIntersection[i].stroke_match,
+          contextMatch: sortedIntersection[i].context_match,
+          reliability: `${sortedIntersection[i].reliability}%`,
+          checked: false,
+        });
+      } else {
+        // null로 채움
+        top5Intersection.push({
+          character: null,
+          strokeMatch: null,
+          contextMatch: null,
+          reliability: null,
+          checked: false,
+        });
+      }
+    }
+    
+    data[target.id] = top5Intersection;
   });
   return data;
 };
@@ -114,7 +143,8 @@ const STYLES = {
 
 const DetailPage = ({ item, onBack }) => {
   // Mock 데이터 사용 (실제로는 props나 API에서 받아옴)
-  const sampleText = mockRubbingDetail.text_content;
+  // 구두점 복원 모델 적용된 텍스트 사용 (쉼표, 마침표 등 포함)
+  const sampleText = mockRubbingDetail.text_content_with_punctuation || mockRubbingDetail.text_content;
   const rubbingDetail = mockRubbingDetail;
   const statistics = mockRubbingStatistics;
 
@@ -607,60 +637,82 @@ const DetailPage = ({ item, onBack }) => {
                               </div>
                               {/* 테이블 바디 */}
                               <div>
-                                {candidates[selectedCharId].map((candidate, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center gap-4 px-4 py-4 border-b border-[#F6F7FE] last:border-b-0 bg-white"
-                                  >
-                                    <div className="w-[64px] flex items-center">
-                                      <input
-                                        type="checkbox"
-                                        checked={candidate.checked}
-                                        onChange={() => handleCandidateCheck(selectedCharId, idx)}
-                                        className="w-4 h-4 rounded border-[#c0c5dc] border-2 cursor-pointer"
-                                        style={{ accentColor: COLORS.secondary }}
-                                      />
+                                {candidates[selectedCharId].map((candidate, idx) => {
+                                  // null 값 처리 (교집합이 5개 미만일 때)
+                                  if (candidate.character === null) {
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className="flex items-center gap-4 px-4 py-4 border-b border-[#F6F7FE] last:border-b-0 bg-gray-50"
+                                      >
+                                        <div className="w-[64px] flex items-center">
+                                          <div className="w-4 h-4"></div>
+                                        </div>
+                                        <span className="w-[64px] text-gray-400" style={{ fontSize: "20px", lineHeight: "1" }}>
+                                          -
+                                        </span>
+                                        <span className="w-[64px] text-xs text-gray-400">-</span>
+                                        <span className="w-[56px] text-xs text-gray-400">-</span>
+                                        <span className="w-[56px] text-xs text-gray-400">-</span>
+                                      </div>
+                                    );
+                                  }
+                                  
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-4 px-4 py-4 border-b border-[#F6F7FE] last:border-b-0 bg-white"
+                                    >
+                                      <div className="w-[64px] flex items-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={candidate.checked}
+                                          onChange={() => handleCandidateCheck(selectedCharId, idx)}
+                                          className="w-4 h-4 rounded border-[#c0c5dc] border-2 cursor-pointer"
+                                          style={{ accentColor: COLORS.secondary }}
+                                        />
+                                      </div>
+                                      <span
+                                        className="w-[64px] cursor-pointer hover:opacity-70 transition-opacity"
+                                        style={{
+                                          fontSize: "20px",
+                                          lineHeight: "1",
+                                          fontWeight: 500,
+                                          color: candidate.checked ? COLORS.secondary : COLORS.darkGray,
+                                          fontFamily: "'Noto Serif KR', 'HanaMinB', 'Batang', serif",
+                                        }}
+                                        onClick={() => {
+                                          // 같은 글자를 다시 클릭하면 선택 해제
+                                          if (selectedCharForCluster === candidate.character) {
+                                            setSelectedCharForCluster(null);
+                                          } else {
+                                            setSelectedCharForCluster(candidate.character);
+                                          }
+                                        }}
+                                      >
+                                        {candidate.character}
+                                      </span>
+                                      <span
+                                        className="w-[64px] text-xs whitespace-nowrap"
+                                        style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
+                                      >
+                                        {candidate.reliability}
+                                      </span>
+                                      <span
+                                        className="w-[56px] text-xs"
+                                        style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
+                                      >
+                                        {candidate.strokeMatch === null ? "-" : `${candidate.strokeMatch.toFixed(1)}%`}
+                                      </span>
+                                      <span
+                                        className="w-[56px] text-xs"
+                                        style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
+                                      >
+                                        {candidate.contextMatch === null ? "-" : `${candidate.contextMatch.toFixed(1)}%`}
+                                      </span>
                                     </div>
-                                    <span
-                                      className="w-[64px] cursor-pointer hover:opacity-70 transition-opacity"
-                                      style={{
-                                        fontSize: "20px",
-                                        lineHeight: "1",
-                                        fontWeight: 500,
-                                        color: candidate.checked ? COLORS.secondary : COLORS.darkGray,
-                                        fontFamily: "'Noto Serif KR', 'HanaMinB', 'Batang', serif",
-                                      }}
-                                      onClick={() => {
-                                        // 같은 글자를 다시 클릭하면 선택 해제
-                                        if (selectedCharForCluster === candidate.character) {
-                                          setSelectedCharForCluster(null);
-                                        } else {
-                                          setSelectedCharForCluster(candidate.character);
-                                        }
-                                      }}
-                                    >
-                                      {candidate.character}
-                                    </span>
-                                    <span
-                                      className="w-[64px] text-xs whitespace-nowrap"
-                                      style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
-                                    >
-                                      {candidate.reliability}
-                                    </span>
-                                    <span
-                                      className="w-[56px] text-xs"
-                                      style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
-                                    >
-                                      {candidate.strokeMatch === null ? "-" : `${candidate.strokeMatch.toFixed(1)}%`}
-                                    </span>
-                                    <span
-                                      className="w-[56px] text-xs"
-                                      style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
-                                    >
-                                      {candidate.contextMatch.toFixed(1)}%
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>
@@ -740,7 +792,7 @@ const DetailPage = ({ item, onBack }) => {
                       data={{
                         name: "Source Image",
                         type: "root",
-                        imgUrl: null, // 실제 이미지 URL이 있으면 여기에 추가
+                        imgUrl: `/images/rubbings/cropped/rubbing_${rubbingDetail.id}_target_${selectedCharId}.jpg`, // 탁본 이미지에서 해당 글자 부분 크롭한 이미지 URL (백엔드에서 제공)
                         children: [
                           {
                             name: "Vision Model (Swin)",
@@ -851,7 +903,7 @@ const DetailPage = ({ item, onBack }) => {
                               {candidate.strokeMatch === null ? "-" : `${candidate.strokeMatch.toFixed(1)}%`}
                             </span>
                             <span className="w-[56px] text-xs" style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}>
-                              {candidate.contextMatch.toFixed(1)}%
+                              {candidate.contextMatch === null ? "-" : `${candidate.contextMatch.toFixed(1)}%`}
                             </span>
                           </div>
                         ))}

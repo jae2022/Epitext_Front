@@ -35,8 +35,10 @@ CREATE INDEX idx_rubbings_is_completed ON rubbings(is_completed);  -- 필터링�
 CREATE TABLE rubbing_details (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     rubbing_id INTEGER NOT NULL,
-    text_content TEXT,                         -- 텍스트 내용 (JSON 배열 또는 TEXT)
+    text_content TEXT,                         -- OCR 결과 텍스트 (JSON 배열 또는 TEXT, 구두점 복원 전)
+    text_content_with_punctuation TEXT,        -- 구두점 복원 모델 적용 후 텍스트 (쉼표, 마침표 등 포함)
     font_types VARCHAR(255),                   -- 폰트 타입 (JSON 배열: ["행서체", "전서체"])
+                                              -- 가능한 값: "전서", "예서", "해서", "행서", "초서" (여러개 가능)
     damage_percentage DECIMAL(5,2),            -- 손상 비율
     total_processing_time INTEGER,            -- 총 처리 시간 (초)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -70,6 +72,11 @@ CREATE TABLE restoration_targets (
     char_index INTEGER NOT NULL,               -- 글자 인덱스 (0부터 시작)
     position VARCHAR(50),                      -- "1행 1자" 형식
     damage_type VARCHAR(20),                   -- "부분_훼손" 또는 "완전_훼손"
+    cropped_image_url VARCHAR(255),            -- 탁본 이미지에서 해당 글자 부분 크롭한 이미지 URL
+    crop_x INTEGER,                            -- 크롭 영역 X 좌표 (픽셀)
+    crop_y INTEGER,                            -- 크롭 영역 Y 좌표 (픽셀)
+    crop_width INTEGER,                         -- 크롭 영역 너비 (픽셀)
+    crop_height INTEGER,                        -- 크롭 영역 높이 (픽셀)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (rubbing_id) REFERENCES rubbings(id) ON DELETE CASCADE
 );
@@ -228,13 +235,23 @@ Response: RubbingDetail
     "見性寂炤首□玄應者",
     ...
   ],
-  "font_types": ["행서체", "전서체"],
+  "text_content_with_punctuation": [
+    "高□洛□歸法寺住持，",
+    "見性寂炤首□玄應者。",
+    ...
+  ],
+  "font_types": ["행서체", "전서체"],  // 전서, 예서, 해서, 행서, 초서 중 여러개 가능
   "damage_percentage": 31.6,
   "processed_at": "2025-10-28T16:23:00Z",
   "total_processing_time": 222,
   "created_at": "2025-10-28T06:30:00Z",
   "updated_at": "2025-10-28T16:23:00Z"
 }
+
+주의사항:
+- text_content: OCR 결과 (구두점 복원 전)
+- text_content_with_punctuation: 구두점 복원 모델 적용 후 (쉼표, 마침표 등 포함)
+- font_types: 전서, 예서, 해서, 행서, 초서 중 분석 결과에 따라 여러개 가능
 ```
 
 ### 3.4 탁본 통계 조회
@@ -274,7 +291,7 @@ Response: Array<RestorationTarget>
 GET /api/rubbings/:id/targets/:targetId/candidates
 
 Response: {
-  "top5": Array<Candidate>,  // 상위 5개 (표시용)
+  "top5": Array<Candidate>,  // 상위 5개 (표시용, 교집합 기준)
   "all": Array<Candidate>    // 전체 10개 (시각화용)
 }
 
@@ -289,6 +306,12 @@ Candidate 구조:
   "model_type": "both",      // "nlp" | "both" | "vision"
   "reliability": 80.5        // F1 Score
 }
+
+주의사항:
+- top5는 획 일치도와 문맥 일치도 둘 다 존재하는 후보(교집합)만 포함
+- 교집합이 5개 미만일 경우 null 값으로 채워서 항상 5개 유지
+- null 값 예시: { "character": null, "stroke_match": null, "context_match": null, "reliability": null }
+- 교집합을 신뢰도(reliability) 기준으로 정렬하여 상위 5개 선택
 ```
 
 ### 3.7 유추 근거 데이터 조회
@@ -296,9 +319,38 @@ Candidate 구조:
 GET /api/rubbings/:id/targets/:targetId/reasoning
 
 Response: {
+  "imgUrl": "/images/rubbings/cropped/rubbing_1_target_1.jpg",  // 탁본 이미지에서 해당 글자 부분 크롭한 이미지 URL
   "vision": Array<Candidate>,  // Vision 모델 후보 (획 일치도 기준 정렬)
   "nlp": Array<Candidate>      // NLP 모델 후보 (문맥 일치도 기준 정렬)
 }
+
+주의사항:
+- imgUrl: 탁본 이미지에서 해당 복원 대상 글자 부분을 크롭한 이미지 URL
+- 크롭 이미지는 AI 모델 처리 시 생성되어 저장됨
+- 크롭 영역은 row_index와 char_index를 기반으로 계산됨
+```
+
+### 3.7.1 복원 대상 글자 크롭 이미지 조회 (별도 엔드포인트)
+```
+GET /api/rubbings/:id/targets/:targetId/cropped-image
+
+Response: File (image/jpeg 또는 image/png)
+Content-Type: image/jpeg
+
+구현 예시 (Python Flask):
+@app.route('/api/rubbings/<int:rubbing_id>/targets/<int:target_id>/cropped-image')
+def get_cropped_image(rubbing_id, target_id):
+    target = RestorationTarget.query.filter_by(
+        id=target_id, 
+        rubbing_id=rubbing_id
+    ).first()
+    
+    if not target:
+        return {"error": "Target not found"}, 404
+    
+    # 크롭된 이미지 경로 반환
+    cropped_image_path = f"/images/rubbings/cropped/rubbing_{rubbing_id}_target_{target_id}.jpg"
+    return send_file(cropped_image_path, mimetype='image/jpeg')
 ```
 
 ### 3.8 검수 상태 조회
@@ -413,6 +465,11 @@ Response: {
 ### 4.5 평균 신뢰도 계산
 - `average_reliability`는 검수한 글자들의 신뢰도 평균
 - `inspection_records` 테이블에서 해당 `rubbing_id`의 `reliability` 평균 계산
+- 검수 현황 카드에는 다음 통계가 표시됨:
+  - 검수 완료 글자 수: `inspection_records` 테이블의 레코드 수
+  - 평균 신뢰도: 검수한 글자들의 신뢰도 평균
+  - 최고 신뢰도: 검수한 글자들의 신뢰도 최대값
+  - 최저 신뢰도: 검수한 글자들의 신뢰도 최소값
 
 ### 4.6 탁본 손상 정도
 - `damage_level`은 복원 대상 비율 (%)
@@ -428,6 +485,35 @@ Response: {
 - "복원 진행중" 페이지: `is_completed = false`
 - "전체 기록" 페이지: 전체 조회
 
+### 4.9 구두점 복원 모델
+- OCR 결과(`text_content`)에 구두점 복원 모델을 적용하여 `text_content_with_punctuation` 생성
+- 구두점 복원 모델은 쉼표(，), 마침표(。), 줄바꿈 등을 추가
+- 프론트엔드에서는 `text_content_with_punctuation`를 사용하여 텍스트 표시
+- 구두점에 따라 줄바꿈이 자연스럽게 이루어짐
+
+### 4.10 교집합 처리 (검수 대상 추천 한자)
+- 검수 대상 추천 한자 표에는 획 일치도와 문맥 일치도 둘 다 존재하는 후보만 표시
+- 교집합 계산:
+  ```python
+  intersection = [c for c in candidates if c.stroke_match is not None and c.context_match is not None]
+  ```
+- 교집합을 신뢰도(reliability) 기준으로 정렬하여 상위 5개 선택
+- 교집합이 5개 미만일 경우 null 값으로 채워서 항상 5개 유지
+- null 값 예시: `{ "character": null, "stroke_match": null, "context_match": null, "reliability": null }`
+
+### 4.11 폰트 타입 분석
+- 폰트 타입은 전서, 예서, 해서, 행서, 초서 중 분석 결과에 따라 여러개 가능
+- `font_types` 필드는 JSON 배열 형식: `["행서체", "전서체"]`
+- 프론트엔드에서 태그로 표시됨
+
+### 4.12 탁본 이미지 크롭 (유추 근거 cluster용)
+- AI 모델 처리 시 각 복원 대상 글자 부분을 탁본 이미지에서 크롭하여 저장
+- 크롭 영역은 `row_index`와 `char_index`를 기반으로 계산
+- 크롭된 이미지는 `/images/rubbings/cropped/rubbing_{rubbing_id}_target_{target_id}.jpg` 형식으로 저장
+- `restoration_targets` 테이블에 `cropped_image_url` 필드에 경로 저장
+- 크롭 좌표 정보(`crop_x`, `crop_y`, `crop_width`, `crop_height`)도 함께 저장
+- 유추 근거 데이터 조회 시 `imgUrl` 필드에 크롭된 이미지 URL 포함
+
 ---
 
 ## 5. 데이터 흐름
@@ -442,6 +528,10 @@ Response: {
    → 백그라운드 작업
 
 3. AI 모델 처리 완료
+   → OCR 결과 생성 → text_content 저장
+   → 구두점 복원 모델 적용 → text_content_with_punctuation 저장
+   → 폰트 타입 분석 → font_types 저장 (전서, 예서, 해서, 행서, 초서 중 여러개)
+   → 각 복원 대상 글자 부분 크롭 → cropped_image_url 저장
    → rubbing_details, rubbing_statistics, restoration_targets, candidates 테이블에 데이터 저장
    → rubbings 테이블 업데이트:
      - status: 상태 계산 로직 적용 ("우수" | "양호" | "미흡")
@@ -460,6 +550,11 @@ Response: {
 2. 검수 현황 업데이트
    → rubbings.inspection_status: "X자 완료" (inspection_records 개수)
    → rubbings.average_reliability: 검수한 글자들의 평균 신뢰도
+   → 검수 현황 카드 통계 계산:
+     - 검수 완료 글자 수: inspection_records 레코드 수
+     - 평균 신뢰도: 검수한 글자들의 신뢰도 평균
+     - 최고 신뢰도: 검수한 글자들의 신뢰도 최대값
+     - 최저 신뢰도: 검수한 글자들의 신뢰도 최소값
 ```
 
 ### 5.3 복원 완료 처리

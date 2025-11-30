@@ -204,15 +204,24 @@ const ReasoningCluster = ({ data, selectedChar, selectedReliability, height = 60
             rootCircle.transition().delay(0).duration(300).ease(d3.easeCubicInOut).attr("opacity", 1);
 
             if (d.data.imgUrl) {
-              const rootText = node
-                .append("text")
-                .attr("dy", 4)
-                .attr("text-anchor", "middle")
-                .text("IMG")
-                .attr("font-size", 10)
-                .attr("opacity", 0);
-              rootText.transition().delay(0).duration(300).ease(d3.easeCubicInOut).attr("opacity", 1);
+              // 크롭된 탁본 이미지 표시
+              const imageGroup = node.append("g").attr("opacity", 0);
+              const clipPath = svg.append("defs").append("clipPath").attr("id", `clip-${d.data.id || "root"}`);
+              clipPath.append("circle").attr("r", 24);
+              
+              imageGroup
+                .append("image")
+                .attr("href", d.data.imgUrl)
+                .attr("x", -24)
+                .attr("y", -24)
+                .attr("width", 48)
+                .attr("height", 48)
+                .attr("clip-path", `url(#clip-${d.data.id || "root"})`)
+                .attr("preserveAspectRatio", "xMidYMid slice");
+              
+              imageGroup.transition().delay(0).duration(300).ease(d3.easeCubicInOut).attr("opacity", 1);
             } else {
+              // 이미지가 없을 때 "IMG" 텍스트 표시
               const rootText = node
                 .append("text")
                 .attr("dy", 4)
@@ -223,7 +232,6 @@ const ReasoningCluster = ({ data, selectedChar, selectedReliability, height = 60
                 .attr("opacity", 0);
               rootText.transition().delay(0).duration(300).ease(d3.easeCubicInOut).attr("opacity", 1);
             }
-            // Source Image 텍스트 삭제
           } else if (type === "model") {
             // Model Node Styling (Root->Model 링크 후 나타남)
             const modelIndex = d.data.name.includes("Vision") ? 0 : 1;
