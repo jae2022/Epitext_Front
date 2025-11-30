@@ -190,3 +190,32 @@ export const uploadRubbing = async (file) => {
     throw error;
   }
 };
+
+/**
+ * 탁본 원본 파일 다운로드
+ * @param {number} id - 탁본 ID
+ * @param {string} filename - 다운로드할 파일명
+ * @returns {Promise} 다운로드 결과
+ */
+export const downloadRubbing = async (id, filename) => {
+  try {
+    const response = await apiClient.get(`/api/rubbings/${id}/download`, {
+      responseType: "blob", // 파일 다운로드를 위해 blob 타입 사용
+    });
+
+    // Blob을 다운로드 링크로 변환
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to download rubbing:", error);
+    throw error;
+  }
+};

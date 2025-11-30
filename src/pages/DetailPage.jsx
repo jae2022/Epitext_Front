@@ -345,8 +345,17 @@ const DetailPage = ({ item, onBack }) => {
             <div className="bg-white p-6" style={STYLES.card}>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">탁본 정보</h2>
               <div className="flex gap-6">
-                <div className="w-[238px] h-[187px] bg-gray-100 rounded-lg flex items-center justify-center">
-                  <span className="text-gray-400">이미지</span>
+                <div className="w-[238px] h-[187px] bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="/귀법사적소수좌현응묘지명.png" 
+                    alt="탁본 이미지" 
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      // 이미지 로드 실패 시 대체 텍스트 표시
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerHTML = '<span class="text-gray-400">이미지</span>';
+                    }}
+                  />
                 </div>
                 <div className="flex-1">
                   <div className="mb-4">
@@ -360,7 +369,7 @@ const DetailPage = ({ item, onBack }) => {
                         marginBottom: "8px",
                       }}
                     >
-                      파일명: 귀법사적수화현응모지명.jpg
+                      파일명: 귀법사적소수좌현응묘지명.jpg
                     </p>
                     <div
                       style={{

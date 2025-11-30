@@ -1,4 +1,5 @@
 import React from "react";
+import { downloadRubbing } from "../api/requests";
 
 const StatusBadge = ({ status }) => {
   const statusConfig = {
@@ -51,7 +52,19 @@ const ActionButton = ({ type, disabled = false, status, borderColor = "#fafbfd",
 };
 
 const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
-  const { id, status, date, restorationStatus, processingTime, damageLevel, inspectionStatus, reliability } = row;
+  const { id, status, date, restorationStatus, processingTime, damageLevel, inspectionStatus, reliability, filename } = row;
+  
+  // 원본 파일 다운로드 핸들러
+  const handleDownload = async (e) => {
+    e.stopPropagation(); // 행 클릭 이벤트 방지
+    try {
+      const downloadFilename = filename || `rubbing_${id}.jpg`;
+      await downloadRubbing(id, downloadFilename);
+    } catch (err) {
+      console.error("다운로드 실패:", err);
+      alert("파일 다운로드에 실패했습니다.");
+    }
+  };
 
   // 탁본 복원 버튼 비활성화할 ID 목록 (7, 5, 3, 2)
   const disabledRestoreIds = [7, 5, 3, 2];
@@ -86,7 +99,11 @@ const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
 
             {/* 원본 파일 */}
             <div className="w-[64px]">
-              <button className="text-primary-orange hover:opacity-80 transition-opacity">
+              <button 
+                onClick={handleDownload}
+                className="text-primary-orange hover:opacity-80 transition-opacity cursor-pointer"
+                title="원본 파일 다운로드"
+              >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
