@@ -1,152 +1,75 @@
 import React, { useState, useMemo, useCallback } from "react";
 import ReasoningCluster from "../components/ReasoningCluster";
+import {
+  mockRubbingDetail,
+  mockRubbingStatistics,
+  mockRestorationTargets,
+  generateMockCandidates,
+  formatDate,
+  formatProcessingTime,
+} from "../mocks/mockData";
 
-// 샘플 데이터 - 실제로는 props로 받아야 함
-const sampleText = [
-  "高□洛□歸法寺住持",
-  "見性寂炤首□玄應者",
-  "立□第十五□肅宗□子",
-  "□□歲下元己未二月十",
-  "□日甲子薨卒二十一日",
-  "壬申茶□以三月□五日",
-  "乙酉□舍利□於八德□",
-  "□□歲下元己未二月十",
-  "□日甲子薨卒二十一日",
-  "壬申茶□以三月□五日",
-  "乙酉□舍利□於八德□",
-  "□□歲下元己未二月十",
-  "□日甲子薨卒二十一日",
-  "壬申茶□以三月□五日",
-  "乙酉□舍利□於八德□",
-  "□□歲下元己未二月十",
-  "□日甲子薨卒二十一日",
-  "壬申茶□以三月□五日",
-  "高□洛□歸法寺住持",
-  "見性□炤首□玄應者",
-  "立□□十五□肅宗□子",
-  "□□歲下元己未二月十",
-  "□日甲子薨卒二十一日",
-  "壬申茶□以三月□五日",
-  "□□歲下元己未二月十",
-];
-
-// 복원 대상 글자 위치 데이터 - 78개 생성
+// 복원 대상 글자 위치 데이터 생성 (mockRestorationTargets를 사용하되, 기존 형식과 호환되도록 변환)
 const generateRestorationTargets = () => {
-  const targets = [];
-  let id = 1;
-
-  // sampleText에서 모든 □ 위치 찾기
-  sampleText.forEach((text, rowIndex) => {
-    text.split("").forEach((char, charIndex) => {
-      if (char === "□") {
-        targets.push({
-          id: id++,
-          position: `${rowIndex + 1}행 ${charIndex + 1}자`,
-          row: rowIndex,
-          char: charIndex,
-        });
-      }
-    });
-  });
-
-  // 78개가 되도록 더미 데이터 추가
-  while (targets.length < 78) {
-    const rowIndex = Math.floor(targets.length / 10) + 10;
-    const charIndex = targets.length % 10;
-    targets.push({
-      id: id++,
-      position: `${rowIndex + 1}행 ${charIndex + 1}자`,
-      row: rowIndex,
-      char: charIndex,
-    });
-  }
-
-  return targets.slice(0, 78); // 정확히 78개만 반환
+  // mockRestorationTargets를 기존 형식으로 변환
+  return mockRestorationTargets.map((target) => ({
+    id: target.id,
+    position: target.position,
+    row: target.row_index,
+    char: target.char_index,
+  }));
 };
 
 const restorationTargets = generateRestorationTargets();
 
-// 선택된 글자에 대한 후보 한자 데이터 생성 함수
+// 후보 데이터 생성 (mockData의 generateMockCandidates 사용)
+// 교집합 처리: 획 일치도와 문맥 일치도 둘 다 존재하는 후보만 표시
+// 교집합이 5개 미만일 경우 null로 채워서 항상 5개 유지
 const generateCandidateData = () => {
   const data = {};
-
-  // F1 score 계산 함수 (획 일치도와 문맥 일치도의 조화평균)
-  // strokeMatch가 null이면 문맥 일치도가 바로 전체 신뢰도가 됨 (완전 훼손의 경우)
-  const calculateF1Score = (strokeMatch, contextMatch) => {
-    // strokeMatch가 null이면 문맥 일치도를 그대로 반환 (F1 score 계산 없음)
-    if (strokeMatch === null) return contextMatch;
-    if (strokeMatch === 0 && contextMatch === 0) return 0;
-    return (2 * strokeMatch * contextMatch) / (strokeMatch + contextMatch);
-  };
-
-  const sampleCandidates = [
-    [
-      // 완전 훼손: 획 일치도가 없으므로 모든 후보의 획 일치도가 null
-      { character: "麗", strokeMatch: null, contextMatch: 76.8, checked: false },
-      { character: "郡", strokeMatch: null, contextMatch: 54.8, checked: false },
-      { character: "鄕", strokeMatch: null, contextMatch: 25.3, checked: false },
-      { character: "麓", strokeMatch: null, contextMatch: 30.4, checked: false },
-      { character: "楚", strokeMatch: null, contextMatch: 14.6, checked: false },
-      { character: "都", strokeMatch: null, contextMatch: 12.4, checked: false },
-      { character: "散", strokeMatch: null, contextMatch: 10.2, checked: false },
-      { character: "椰", strokeMatch: null, contextMatch: 8.9, checked: false },
-      { character: "郁", strokeMatch: null, contextMatch: 7.5, checked: false },
-      { character: "洛", strokeMatch: null, contextMatch: 6.1, checked: false },
-    ],
-    [
-      // Vision 순위와 NLP 순위를 다르게 설정하여 다이나믹함 추가
-      // Vision 순위: 麗(1), 郁(2), 都(3), 散(4), 椰(5), 洛(6), 郡(7), 鄕(8), 麓(9), 楚(10)
-      // NLP 순위: 麗(1), 郡(2), 鄕(3), 麓(4), 楚(5), 都(6), 散(7), 椰(8), 郁(9), 洛(10)
-      { character: "麗", strokeMatch: 85.4, contextMatch: 70.3, checked: false }, // Vision 1위, NLP 1위
-      { character: "郡", strokeMatch: 55.8, contextMatch: 68.5, checked: false }, // Vision 7위, NLP 2위
-      { character: "鄕", strokeMatch: 50.4, contextMatch: 65.2, checked: false }, // Vision 8위, NLP 3위
-      { character: "麓", strokeMatch: 45.2, contextMatch: 62.1, checked: false }, // Vision 9위, NLP 4위
-      { character: "楚", strokeMatch: 40.1, contextMatch: 58.9, checked: false }, // Vision 10위, NLP 5위
-      { character: "郁", strokeMatch: 80.8, contextMatch: 45.2, checked: false }, // Vision 2위, NLP 9위
-      { character: "都", strokeMatch: 75.5, contextMatch: 52.3, checked: false }, // Vision 3위, NLP 6위
-      { character: "散", strokeMatch: 70.1, contextMatch: 48.7, checked: false }, // Vision 4위, NLP 7위
-      { character: "椰", strokeMatch: 65.6, contextMatch: 46.5, checked: false }, // Vision 5위, NLP 8위
-      { character: "洛", strokeMatch: 60.3, contextMatch: 42.1, checked: false }, // Vision 6위, NLP 10위
-    ],
-    [
-      // Vision 순위와 NLP 순위를 다르게 설정
-      { character: "寂", strokeMatch: 90.7, contextMatch: 75.3, checked: false }, // Vision 1위, NLP 3위
-      { character: "宗", strokeMatch: 85.2, contextMatch: 80.3, checked: false }, // Vision 2위, NLP 1위
-      { character: "肅", strokeMatch: 80.4, contextMatch: 70.6, checked: false }, // Vision 3위, NLP 4위
-      { character: "歲", strokeMatch: 75.9, contextMatch: 77.8, checked: false }, // Vision 4위, NLP 2위
-      { character: "下", strokeMatch: 70.5, contextMatch: 60.8, checked: false }, // Vision 5위, NLP 5위
-      { character: "上", strokeMatch: 65.3, contextMatch: 55.4, checked: false }, // Vision 6위, NLP 6위
-      { character: "中", strokeMatch: 60.1, contextMatch: 50.2, checked: false }, // Vision 7위, NLP 7위
-      { character: "年", strokeMatch: 55.8, contextMatch: 45.7, checked: false }, // Vision 8위, NLP 8위
-      { character: "月", strokeMatch: 50.4, contextMatch: 40.3, checked: false }, // Vision 9위, NLP 9위
-      { character: "日", strokeMatch: 45.2, contextMatch: 35.1, checked: false }, // Vision 10위, NLP 10위
-    ],
-  ];
-
-  // 모든 restorationTargets에 대해 후보 데이터 생성 및 F1 score 계산
   restorationTargets.forEach((target) => {
-    const allCandidates = sampleCandidates[target.id % sampleCandidates.length].map((c) => {
-      const f1Score = calculateF1Score(c.strokeMatch, c.contextMatch);
-      return {
-        ...c,
-        reliability: `${f1Score.toFixed(1)}%`,
-      };
-    });
+    const candidates = generateMockCandidates(target.id);
 
-    // 최종 신뢰도 기준으로 정렬하여 상위 5개만 선택
-    const sortedCandidates = [...allCandidates].sort((a, b) => {
-      const scoreA = parseFloat(a.reliability);
-      const scoreB = parseFloat(b.reliability);
-      return scoreB - scoreA;
-    });
+    // 전체 후보 데이터 (시각화용)
+    data[`${target.id}_all`] = candidates.all.map((c) => ({
+      character: c.character,
+      strokeMatch: c.stroke_match,
+      contextMatch: c.context_match,
+      reliability: `${c.reliability}%`,
+      checked: false,
+    }));
 
-    // 상위 5개만 저장 (표에 표시될 데이터)
-    data[target.id] = sortedCandidates.slice(0, 5);
+    // 교집합 계산: 획 일치도와 문맥 일치도 둘 다 존재하는 후보
+    const intersection = candidates.all.filter((c) => c.stroke_match !== null && c.context_match !== null);
 
-    // 전체 10개 후보도 저장 (팝업 cluster용)
-    data[`${target.id}_all`] = allCandidates;
+    // 교집합을 신뢰도 기준으로 정렬
+    const sortedIntersection = [...intersection].sort((a, b) => b.reliability - a.reliability);
+
+    // 상위 5개 선택 (5개 미만이면 null로 채움)
+    const top5Intersection = [];
+    for (let i = 0; i < 5; i++) {
+      if (i < sortedIntersection.length) {
+        top5Intersection.push({
+          character: sortedIntersection[i].character,
+          strokeMatch: sortedIntersection[i].stroke_match,
+          contextMatch: sortedIntersection[i].context_match,
+          reliability: `${sortedIntersection[i].reliability}%`,
+          checked: false,
+        });
+      } else {
+        // null로 채움
+        top5Intersection.push({
+          character: null,
+          strokeMatch: null,
+          contextMatch: null,
+          reliability: null,
+          checked: false,
+        });
+      }
+    }
+
+    data[target.id] = top5Intersection;
   });
-
   return data;
 };
 
@@ -217,6 +140,12 @@ const STYLES = {
 };
 
 const DetailPage = ({ item, onBack }) => {
+  // Mock 데이터 사용 (실제로는 props나 API에서 받아옴)
+  // 구두점 복원 모델 적용된 텍스트 사용 (쉼표, 마침표 등 포함)
+  const sampleText = mockRubbingDetail.text_content_with_punctuation || mockRubbingDetail.text_content;
+  const rubbingDetail = mockRubbingDetail;
+  const statistics = mockRubbingStatistics;
+
   const [selectedCharId, setSelectedCharId] = useState(null);
   const [checkedChars, setCheckedChars] = useState(new Set()); // Set으로 변경하여 O(1) 조회
   const [candidates, setCandidates] = useState(candidateData);
@@ -280,7 +209,7 @@ const DetailPage = ({ item, onBack }) => {
   );
 
   const inspectionCount = checkedChars.size;
-  const totalInspectionTargets = 78; // 검수 대상 글자 수는 78자
+  const totalInspectionTargets = statistics.restoration_targets; // 검수 대상 글자 수
 
   // 신뢰도 통계 계산
   const reliabilityStats = useMemo(() => {
@@ -346,13 +275,13 @@ const DetailPage = ({ item, onBack }) => {
               <h2 className="text-lg font-semibold text-gray-800 mb-4">탁본 정보</h2>
               <div className="flex gap-6">
                 <div className="w-[238px] h-[187px] bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                  <img 
-                    src="/귀법사적소수좌현응묘지명.png" 
-                    alt="탁본 이미지" 
+                  <img
+                    src="/귀법사적소수좌현응묘지명.png"
+                    alt="탁본 이미지"
                     className="w-full h-full object-contain"
                     onError={(e) => {
                       // 이미지 로드 실패 시 대체 텍스트 표시
-                      e.target.style.display = 'none';
+                      e.target.style.display = "none";
                       e.target.parentElement.innerHTML = '<span class="text-gray-400">이미지</span>';
                     }}
                   />
@@ -381,14 +310,27 @@ const DetailPage = ({ item, onBack }) => {
                         letterSpacing: "-0.2px",
                       }}
                     >
-                      <p style={{ margin: 0 }}>처리 일시: 2025.10.28 16:23</p>
-                      <p style={{ margin: 0 }}>총 처리 시간: 3분 42초</p>
+                      <p style={{ margin: 0 }}>
+                        처리 일시:{" "}
+                        {rubbingDetail.processed_at
+                          ? `${formatDate(rubbingDetail.processed_at)} ${new Date(rubbingDetail.processed_at).toLocaleTimeString("ko-KR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`
+                          : "-"}
+                      </p>
+                      <p style={{ margin: 0 }}>총 처리 시간: {formatProcessingTime(rubbingDetail.total_processing_time)}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <div className="px-4 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">행서체</div>
-                    <div className="px-4 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">전서체</div>
-                    <div className="px-4 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">탁본 손상 정도 31.6%</div>
+                    {rubbingDetail.font_types.map((font, index) => (
+                      <div key={index} className="px-4 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">
+                        {font}
+                      </div>
+                    ))}
+                    <div className="px-4 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">
+                      탁본 손상 정도 {rubbingDetail.damage_percentage}%
+                    </div>
                   </div>
                 </div>
               </div>
@@ -410,7 +352,7 @@ const DetailPage = ({ item, onBack }) => {
                         fill="none"
                         stroke="#EE7542"
                         strokeWidth="16"
-                        strokeDasharray={`${2 * Math.PI * 65 * 0.316} ${2 * Math.PI * 65}`}
+                        strokeDasharray={`${2 * Math.PI * 65 * (statistics.restoration_percentage / 100)} ${2 * Math.PI * 65}`}
                         strokeDashoffset="0"
                         strokeLinecap="round"
                       />
@@ -418,7 +360,7 @@ const DetailPage = ({ item, onBack }) => {
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center">
                         <p className="text-sm text-gray-600">복원 대상</p>
-                        <p className="text-lg font-semibold text-[#ee7542]">31.6%</p>
+                        <p className="text-lg font-semibold text-[#ee7542]">{statistics.restoration_percentage}%</p>
                       </div>
                     </div>
                   </div>
@@ -436,19 +378,19 @@ const DetailPage = ({ item, onBack }) => {
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">전체 글자 수</p>
-                    <p className="text-base font-semibold">247자</p>
+                    <p className="text-base font-semibold">{statistics.total_characters}자</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">복원 대상 글자 수</p>
-                    <p className="text-base font-semibold">78자</p>
+                    <p className="text-base font-semibold">{statistics.restoration_targets}자</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">탁본 글자 부분 훼손</p>
-                    <p className="text-base font-semibold">49자</p>
+                    <p className="text-base font-semibold">{statistics.partial_damage}자</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">탁본 글자 완전 훼손</p>
-                    <p className="text-base font-semibold">29자</p>
+                    <p className="text-base font-semibold">{statistics.complete_damage}자</p>
                   </div>
                 </div>
               </div>
@@ -698,60 +640,82 @@ const DetailPage = ({ item, onBack }) => {
                               </div>
                               {/* 테이블 바디 */}
                               <div>
-                                {candidates[selectedCharId].map((candidate, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center gap-4 px-4 py-4 border-b border-[#F6F7FE] last:border-b-0 bg-white"
-                                  >
-                                    <div className="w-[64px] flex items-center">
-                                      <input
-                                        type="checkbox"
-                                        checked={candidate.checked}
-                                        onChange={() => handleCandidateCheck(selectedCharId, idx)}
-                                        className="w-4 h-4 rounded border-[#c0c5dc] border-2 cursor-pointer"
-                                        style={{ accentColor: COLORS.secondary }}
-                                      />
+                                {candidates[selectedCharId].map((candidate, idx) => {
+                                  // null 값 처리 (교집합이 5개 미만일 때)
+                                  if (candidate.character === null) {
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className="flex items-center gap-4 px-4 py-4 border-b border-[#F6F7FE] last:border-b-0 bg-gray-50"
+                                      >
+                                        <div className="w-[64px] flex items-center">
+                                          <div className="w-4 h-4"></div>
+                                        </div>
+                                        <span className="w-[64px] text-gray-400" style={{ fontSize: "20px", lineHeight: "1" }}>
+                                          -
+                                        </span>
+                                        <span className="w-[64px] text-xs text-gray-400">-</span>
+                                        <span className="w-[56px] text-xs text-gray-400">-</span>
+                                        <span className="w-[56px] text-xs text-gray-400">-</span>
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-4 px-4 py-4 border-b border-[#F6F7FE] last:border-b-0 bg-white"
+                                    >
+                                      <div className="w-[64px] flex items-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={candidate.checked}
+                                          onChange={() => handleCandidateCheck(selectedCharId, idx)}
+                                          className="w-4 h-4 rounded border-[#c0c5dc] border-2 cursor-pointer"
+                                          style={{ accentColor: COLORS.secondary }}
+                                        />
+                                      </div>
+                                      <span
+                                        className="w-[64px] cursor-pointer hover:opacity-70 transition-opacity"
+                                        style={{
+                                          fontSize: "20px",
+                                          lineHeight: "1",
+                                          fontWeight: 500,
+                                          color: candidate.checked ? COLORS.secondary : COLORS.darkGray,
+                                          fontFamily: "'Noto Serif KR', 'HanaMinB', 'Batang', serif",
+                                        }}
+                                        onClick={() => {
+                                          // 같은 글자를 다시 클릭하면 선택 해제
+                                          if (selectedCharForCluster === candidate.character) {
+                                            setSelectedCharForCluster(null);
+                                          } else {
+                                            setSelectedCharForCluster(candidate.character);
+                                          }
+                                        }}
+                                      >
+                                        {candidate.character}
+                                      </span>
+                                      <span
+                                        className="w-[64px] text-xs whitespace-nowrap"
+                                        style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
+                                      >
+                                        {candidate.reliability}
+                                      </span>
+                                      <span
+                                        className="w-[56px] text-xs"
+                                        style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
+                                      >
+                                        {candidate.strokeMatch === null ? "-" : `${candidate.strokeMatch.toFixed(1)}%`}
+                                      </span>
+                                      <span
+                                        className="w-[56px] text-xs"
+                                        style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
+                                      >
+                                        {candidate.contextMatch === null ? "-" : `${candidate.contextMatch.toFixed(1)}%`}
+                                      </span>
                                     </div>
-                                    <span
-                                      className="w-[64px] cursor-pointer hover:opacity-70 transition-opacity"
-                                      style={{
-                                        fontSize: "20px",
-                                        lineHeight: "1",
-                                        fontWeight: 500,
-                                        color: candidate.checked ? COLORS.secondary : COLORS.darkGray,
-                                        fontFamily: "'Noto Serif KR', 'HanaMinB', 'Batang', serif",
-                                      }}
-                                      onClick={() => {
-                                        // 같은 글자를 다시 클릭하면 선택 해제
-                                        if (selectedCharForCluster === candidate.character) {
-                                          setSelectedCharForCluster(null);
-                                        } else {
-                                          setSelectedCharForCluster(candidate.character);
-                                        }
-                                      }}
-                                    >
-                                      {candidate.character}
-                                    </span>
-                                    <span
-                                      className="w-[64px] text-xs whitespace-nowrap"
-                                      style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
-                                    >
-                                      {candidate.reliability}
-                                    </span>
-                                    <span
-                                      className="w-[56px] text-xs"
-                                      style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
-                                    >
-                                      {candidate.strokeMatch === null ? "-" : `${candidate.strokeMatch.toFixed(1)}%`}
-                                    </span>
-                                    <span
-                                      className="w-[56px] text-xs"
-                                      style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
-                                    >
-                                      {candidate.contextMatch.toFixed(1)}%
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>
@@ -830,7 +794,7 @@ const DetailPage = ({ item, onBack }) => {
                       data={{
                         name: "Source Image",
                         type: "root",
-                        imgUrl: null, // 실제 이미지 URL이 있으면 여기에 추가
+                        imgUrl: `/images/rubbings/cropped/rubbing_${rubbingDetail.id}_target_${selectedCharId}.jpg`, // 탁본 이미지에서 해당 글자 부분 크롭한 이미지 URL (백엔드에서 제공)
                         children: [
                           {
                             name: "Vision Model (Swin)",
@@ -941,7 +905,7 @@ const DetailPage = ({ item, onBack }) => {
                               {candidate.strokeMatch === null ? "-" : `${candidate.strokeMatch.toFixed(1)}%`}
                             </span>
                             <span className="w-[56px] text-xs" style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}>
-                              {candidate.contextMatch.toFixed(1)}%
+                              {candidate.contextMatch === null ? "-" : `${candidate.contextMatch.toFixed(1)}%`}
                             </span>
                           </div>
                         ))}

@@ -53,7 +53,7 @@ const ActionButton = ({ type, disabled = false, status, borderColor = "#fafbfd",
 
 const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
   const { id, status, date, restorationStatus, processingTime, damageLevel, inspectionStatus, reliability, filename } = row;
-  
+
   // 원본 파일 다운로드 핸들러
   const handleDownload = async (e) => {
     e.stopPropagation(); // 행 클릭 이벤트 방지
@@ -99,7 +99,7 @@ const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
 
             {/* 원본 파일 */}
             <div className="w-[64px]">
-              <button 
+              <button
                 onClick={handleDownload}
                 className="text-primary-orange hover:opacity-80 transition-opacity cursor-pointer"
                 title="원본 파일 다운로드"
