@@ -1,37 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import TableRow from "../components/TableRow";
 import { getRubbingList } from "../api/requests";
+import { menuToStatus } from "../utils/statusMapper";
 
-const ListPage = ({ onUploadClick, completedIds, onComplete, onViewDetail, activeMenu }) => {
+const ListPage = ({ onUploadClick, onComplete, onViewDetail, activeMenu }) => {
   const [rubbings, setRubbings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
 
   // 탁본 목록 데이터 로드
-  useEffect(() => {
-    const loadRubbings = async () => {
-      setIsLoading(true);
-      try {
-        // activeMenu에 따라 status 파라미터 설정
-        let status = null;
-        if (activeMenu === "복원 완료") {
-          status = "completed";
-        } else if (activeMenu === "복원 진행중") {
-          status = "in_progress";
-        }
-
-        const data = await getRubbingList(status);
-        setRubbings(data);
-      } catch (error) {
-        console.error("Failed to load rubbings:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadRubbings();
+  const loadRubbings = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const status = menuToStatus(activeMenu);
+      const data = await getRubbingList(status);
+      setRubbings(data);
+    } catch (error) {
+      console.error("Failed to load rubbings:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [activeMenu]);
+
+  useEffect(() => {
+    loadRubbings();
+  }, [loadRubbings]);
 
   // rubbings가 변경될 때 selectAll 상태 업데이트
   useEffect(() => {
@@ -65,23 +59,6 @@ const ListPage = ({ onUploadClick, completedIds, onComplete, onViewDetail, activ
       setSelectedRows([]);
       setSelectAll(false);
       // 데이터 새로고침
-      const loadRubbings = async () => {
-        setIsLoading(true);
-        try {
-          let status = null;
-          if (activeMenu === "복원 완료") {
-            status = "completed";
-          } else if (activeMenu === "복원 진행중") {
-            status = "in_progress";
-          }
-          const data = await getRubbingList(status);
-          setRubbings(data);
-        } catch (error) {
-          console.error("Failed to load rubbings:", error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
       await loadRubbings();
     }
   };
