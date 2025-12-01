@@ -15,9 +15,17 @@ const ListPage = ({ onUploadClick, onComplete, onViewDetail, activeMenu }) => {
     try {
       const status = menuToStatus(activeMenu);
       const data = await getRubbingList(status);
-      setRubbings(data);
+      setRubbings(data || []);
+      console.log(`✅ Loaded ${data?.length || 0} rubbings for menu: ${activeMenu}, status: ${status}`);
     } catch (error) {
       console.error("Failed to load rubbings:", error);
+      setRubbings([]);
+      // 에러 메시지 표시 (선택사항)
+      if (error.response) {
+        console.error("API Error:", error.response.status, error.response.data);
+      } else if (error.request) {
+        console.error("Network Error: 백엔드 서버에 연결할 수 없습니다.");
+      }
     } finally {
       setIsLoading(false);
     }
