@@ -908,7 +908,7 @@ const DetailPage = ({ item, onBack }) => {
                   <div className="flex gap-6 w-full" style={{ minHeight: "400px" }}>
                     {/* 왼쪽: 검수 대상 추천 한자 (절반) */}
                     <div className="flex-1 flex-shrink-0 flex flex-col min-w-0" style={{ minHeight: 0 }}>
-                      <div className="mb-3 flex-shrink-0">
+                      <div className="mb-3 flex-shrink-0 flex items-center" style={{ height: '28px' }}>
                         <div
                           className="flex flex-col justify-center leading-[0] not-italic relative shrink-0 text-[#2a2a3a] text-[16px] text-nowrap tracking-[-0.32px]"
                           style={{ fontWeight: 600 }}
@@ -1007,7 +1007,7 @@ const DetailPage = ({ item, onBack }) => {
 
                     {/* 오른쪽: 번역문 해석 (절반) */}
                     <div className="flex-1 flex-shrink-0 flex flex-col bg-white min-w-0" style={{ minHeight: 0 }}>
-                      <div className="mb-3 flex-shrink-0 flex items-center justify-between">
+                      <div className="mb-3 flex-shrink-0 flex items-center justify-between" style={{ height: '28px' }}>
                         <div
                           className="flex flex-col justify-center leading-[0] not-italic relative shrink-0 text-[#2a2a3a] text-[16px] text-nowrap tracking-[-0.32px]"
                           style={{ fontWeight: 600 }}
