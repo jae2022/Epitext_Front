@@ -219,3 +219,38 @@ export const downloadRubbing = async (id, filename) => {
     throw error;
   }
 };
+
+/**
+ * 번역 조회
+ * @param {number} rubbingId - 탁본 ID
+ * @param {number} targetId - 복원 대상 ID
+ * @returns {Promise} 번역 결과
+ */
+export const getTranslation = async (rubbingId, targetId) => {
+  try {
+    const response = await apiClient.get(`/api/rubbings/${rubbingId}/targets/${targetId}/translation`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch translation:", error);
+    throw error;
+  }
+};
+
+/**
+ * 번역 미리보기 (선택된 한자로 실시간 번역)
+ * @param {number} rubbingId - 탁본 ID
+ * @param {number} targetId - 복원 대상 ID
+ * @param {string} selectedCharacter - 선택된 한자
+ * @returns {Promise} 번역 결과
+ */
+export const previewTranslation = async (rubbingId, targetId, selectedCharacter) => {
+  try {
+    const response = await apiClient.post(`/api/rubbings/${rubbingId}/targets/${targetId}/preview-translation`, {
+      selected_character: selectedCharacter,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to preview translation:", error);
+    throw error;
+  }
+};

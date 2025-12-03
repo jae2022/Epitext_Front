@@ -8,6 +8,7 @@ import {
   formatDate,
   formatProcessingTime,
 } from "../mocks/mockData";
+import { getTranslation, previewTranslation } from "../api/requests";
 
 // 복원 대상 글자 위치 데이터 생성 (mockRestorationTargets를 사용하되, 기존 형식과 호환되도록 변환)
 const generateRestorationTargets = () => {
@@ -227,6 +228,9 @@ const DetailPage = ({ item, onBack }) => {
   const [selectedCharacters, setSelectedCharacters] = useState({}); // charId -> selected character
   const [showReasonPopup, setShowReasonPopup] = useState(false);
   const [selectedCharForCluster, setSelectedCharForCluster] = useState(null); // cluster에서 표시할 선택된 글자
+  const [translation, setTranslation] = useState([]); // 번역문 (줄별 배열)
+  const [selectedRowIndex, setSelectedRowIndex] = useState(null); // 번역을 표시할 행 인덱스
+  const [isLoadingTranslation, setIsLoadingTranslation] = useState(false); // 번역 로딩 상태
 
   const handleCharClick = useCallback((charId) => {
     setSelectedCharId((prev) => (prev === charId ? null : charId));
@@ -852,11 +856,11 @@ const DetailPage = ({ item, onBack }) => {
               </button>
             </div>
             {/* 팝업 내용 영역 */}
-            <div className="h-[calc(100%-80px)] overflow-y-auto p-6">
+            <div className="h-[calc(100%-80px)] overflow-y-auto">
               {selectedCharId && candidates[selectedCharId] && allCandidates[selectedCharId] ? (
-                <div className="flex flex-col gap-6">
-                  {/* 위: ReasoningCluster */}
-                  <div className="flex items-center justify-center bg-gray-50 rounded-lg p-4 min-h-[500px]">
+                <div className="flex flex-col gap-6 p-6">
+                  {/* 위: ReasoningCluster (전체 너비, 전체 높이의 일부) */}
+                  <div className="flex items-center justify-center bg-gray-50 rounded-lg p-4 min-h-[400px] w-full flex-shrink-0">
                     <ReasoningCluster
                       data={{
                         name: "Source Image",
@@ -896,86 +900,215 @@ const DetailPage = ({ item, onBack }) => {
                           ? candidates[selectedCharId].find((c) => c.character === selectedCharForCluster)?.reliability
                           : null
                       }
-                      height={500}
+                      height={400}
                     />
                   </div>
-                  {/* 아래: 표 */}
-                  <div className="flex-shrink-0 flex flex-col">
-                    <div className="mb-3">
-                      <div
-                        className="flex flex-col justify-center leading-[0] not-italic relative shrink-0 text-[#2a2a3a] text-[16px] text-nowrap tracking-[-0.32px]"
-                        style={{ fontWeight: 600 }}
-                      >
-                        <p className="leading-[normal] whitespace-pre">검수 대상 추천 한자</p>
-                      </div>
-                    </div>
-                    {/* 테이블 */}
-                    <div className="border border-[#EBEDF8] rounded-[8px] overflow-hidden">
-                      {/* 테이블 헤더 */}
-                      <div className="bg-[#F6F7FE] border-b border-[#EBEDF8] px-4 py-3">
-                        <div className="flex items-center gap-4 text-xs font-medium text-[#484a64]">
-                          <span className="w-[64px]">글자 선택</span>
-                          <span className="w-[64px]">한자</span>
-                          <span className="w-[64px] whitespace-nowrap">전체 신뢰도</span>
-                          <span className="w-[56px] text-xs">획 일치도</span>
-                          <span className="w-[56px] text-xs whitespace-nowrap">문맥 일치도</span>
+
+                  {/* 아래: 좌우 분할 (왼쪽: 검수 대상 추천 한자, 오른쪽: 번역문 해석) */}
+                  <div className="flex gap-6 w-full" style={{ minHeight: "400px" }}>
+                    {/* 왼쪽: 검수 대상 추천 한자 (절반) */}
+                    <div className="flex-1 flex-shrink-0 flex flex-col min-w-0" style={{ minHeight: 0 }}>
+                      <div className="mb-3 flex-shrink-0">
+                        <div
+                          className="flex flex-col justify-center leading-[0] not-italic relative shrink-0 text-[#2a2a3a] text-[16px] text-nowrap tracking-[-0.32px]"
+                          style={{ fontWeight: 600 }}
+                        >
+                          <p className="leading-[normal] whitespace-pre">검수 대상 추천 한자</p>
                         </div>
                       </div>
-                      {/* 테이블 바디 */}
-                      <div>
-                        {candidates[selectedCharId].map((candidate, idx) => (
-                          <div
-                            key={idx}
-                            className={`flex items-center gap-4 px-4 py-4 border-b border-[#F6F7FE] last:border-b-0 bg-white cursor-pointer hover:bg-gray-50 transition-colors ${
-                              selectedCharForCluster === candidate.character ? "bg-blue-50" : ""
-                            }`}
-                            onClick={() => {
-                              // 같은 글자를 다시 클릭하면 선택 해제
-                              if (selectedCharForCluster === candidate.character) {
-                                setSelectedCharForCluster(null);
-                              } else {
-                                setSelectedCharForCluster(candidate.character);
-                              }
-                            }}
-                          >
-                            <div className="w-[64px] flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={candidate.checked}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleCandidateCheck(selectedCharId, idx);
-                                }}
-                                className="w-4 h-4 rounded border-[#c0c5dc] border-2 cursor-pointer"
-                                style={{ accentColor: COLORS.secondary }}
-                              />
-                            </div>
-                            <span
-                              className="w-[64px]"
-                              style={{
-                                fontSize: "20px",
-                                lineHeight: "1",
-                                fontWeight: 500,
-                                color: candidate.checked ? COLORS.secondary : COLORS.darkGray,
-                                fontFamily: "'Noto Serif KR', 'HanaMinB', 'Batang', serif",
+                      {/* 테이블 */}
+                      <div className="border border-[#EBEDF8] rounded-[8px] overflow-hidden flex flex-col flex-1 min-h-0">
+                        {/* 테이블 헤더 */}
+                        <div className="bg-[#F6F7FE] border-b border-[#EBEDF8] px-4 py-3 flex-shrink-0">
+                          <div className="flex items-center gap-4 text-xs font-medium text-[#484a64]">
+                            <span className="w-[64px]">글자 선택</span>
+                            <span className="w-[64px]">한자</span>
+                            <span className="w-[64px] whitespace-nowrap">전체 신뢰도</span>
+                            <span className="w-[56px] text-xs">획 일치도</span>
+                            <span className="w-[56px] text-xs whitespace-nowrap">문맥 일치도</span>
+                          </div>
+                        </div>
+                        {/* 테이블 바디 */}
+                        <div className="flex-1 overflow-y-auto min-h-0">
+                          {candidates[selectedCharId].map((candidate, idx) => (
+                            <div
+                              key={idx}
+                              className={`flex items-center gap-4 px-4 bg-white cursor-pointer hover:bg-gray-50 transition-colors ${
+                                idx < candidates[selectedCharId].length - 1 ? "border-b border-[#F6F7FE]" : ""
+                              } ${selectedCharForCluster === candidate.character ? "bg-blue-50" : ""}`}
+                              style={{ minHeight: "56px", paddingTop: "16px", paddingBottom: "16px" }}
+                              onClick={() => {
+                                if (selectedCharForCluster === candidate.character) {
+                                  setSelectedCharForCluster(null);
+                                } else {
+                                  setSelectedCharForCluster(candidate.character);
+                                  // 번역 미리보기
+                                  if (candidate.character && rubbingDetail.id && candidate.character !== null) {
+                                    const target = restorationTargets.find((t) => t.id === selectedCharId);
+                                    if (target) {
+                                      setIsLoadingTranslation(true);
+                                      previewTranslation(rubbingDetail.id, selectedCharId, candidate.character)
+                                        .then((data) => {
+                                          setTranslation([data.translation]);
+                                          setSelectedRowIndex(target.row);
+                                        })
+                                        .catch((err) => {
+                                          console.error("번역 미리보기 실패:", err);
+                                        })
+                                        .finally(() => {
+                                          setIsLoadingTranslation(false);
+                                        });
+                                    }
+                                  }
+                                }
                               }}
                             >
-                              {candidate.character}
-                            </span>
-                            <span
-                              className="w-[64px] text-xs whitespace-nowrap"
-                              style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
-                            >
-                              {candidate.reliability}
-                            </span>
-                            <span className="w-[56px] text-xs" style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}>
-                              {candidate.strokeMatch === null ? "-" : `${candidate.strokeMatch.toFixed(1)}%`}
-                            </span>
-                            <span className="w-[56px] text-xs" style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}>
-                              {candidate.contextMatch === null ? "-" : `${candidate.contextMatch.toFixed(1)}%`}
-                            </span>
+                              <div className="w-[64px] flex items-center">
+                                <input
+                                  type="checkbox"
+                                  checked={candidate.checked}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleCandidateCheck(selectedCharId, idx);
+                                  }}
+                                  className="w-4 h-4 rounded border-[#c0c5dc] border-2 cursor-pointer"
+                                  style={{ accentColor: COLORS.secondary }}
+                                />
+                              </div>
+                              <span
+                                className="w-[64px]"
+                                style={{
+                                  fontSize: "20px",
+                                  lineHeight: "1",
+                                  fontWeight: 500,
+                                  color: candidate.checked ? COLORS.secondary : COLORS.darkGray,
+                                  fontFamily: "'Noto Serif KR', 'HanaMinB', 'Batang', serif",
+                                }}
+                              >
+                                {candidate.character}
+                              </span>
+                              <span
+                                className="w-[64px] text-xs whitespace-nowrap"
+                                style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}
+                              >
+                                {candidate.reliability}
+                              </span>
+                              <span className="w-[56px] text-xs" style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}>
+                                {candidate.strokeMatch === null ? "-" : `${candidate.strokeMatch.toFixed(1)}%`}
+                              </span>
+                              <span className="w-[56px] text-xs" style={{ color: candidate.checked ? COLORS.secondary : COLORS.darkGray }}>
+                                {candidate.contextMatch === null ? "-" : `${candidate.contextMatch.toFixed(1)}%`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 오른쪽: 번역문 해석 (절반) */}
+                    <div className="flex-1 flex-shrink-0 flex flex-col bg-white min-w-0" style={{ minHeight: 0 }}>
+                      <div className="mb-3 flex-shrink-0 flex items-center justify-between">
+                        <div
+                          className="flex flex-col justify-center leading-[0] not-italic relative shrink-0 text-[#2a2a3a] text-[16px] text-nowrap tracking-[-0.32px]"
+                          style={{ fontWeight: 600 }}
+                        >
+                          <p className="leading-[normal] whitespace-pre">번역문 해석</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const target = restorationTargets.find((t) => t.id === selectedCharId);
+                            if (!target || !rubbingDetail.id) return;
+
+                            setIsLoadingTranslation(true);
+                            try {
+                              const data = await getTranslation(rubbingDetail.id, selectedCharId);
+                              setTranslation([data.translation]);
+                              setSelectedRowIndex(target.row);
+                            } catch (error) {
+                              console.error("번역 로드 실패:", error);
+                              setTranslation(["번역을 불러오는데 실패했습니다."]);
+                            } finally {
+                              setIsLoadingTranslation(false);
+                            }
+                          }}
+                          disabled={isLoadingTranslation}
+                          className="px-3 py-1.5 text-xs font-medium text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ backgroundColor: COLORS.secondary }}
+                        >
+                          {isLoadingTranslation ? "번역 중..." : "번역 보기"}
+                        </button>
+                      </div>
+                      <div
+                        className="flex-1 overflow-y-auto min-h-0 border border-[#EBEDF8] rounded-[8px]"
+                        style={{ padding: "16px 16px 12px 16px" }}
+                      >
+                        {translation.length > 0 && selectedRowIndex !== null ? (
+                          <div className="flex flex-col gap-4">
+                            {/* 원문 */}
+                            <div>
+                              <p className="text-xs text-gray-600 mb-2">원문</p>
+                              <div className="p-4 bg-gray-50 rounded border border-gray-200">
+                                <p className="text-base leading-relaxed" style={STYLES.textContainer}>
+                                  {sampleText[selectedRowIndex]?.split("").map((char, charIndex) => {
+                                    const targetInRow = targetsByRow[selectedRowIndex]?.find((t) => t.char === charIndex);
+                                    const charId = targetInRow ? targetInRow.id : null;
+                                    const isSelected = selectedCharId === charId;
+                                    const isCompleted = charId && checkedChars.has(charId);
+                                    const selectedChar = isCompleted && selectedCharacters[charId] ? selectedCharacters[charId] : char;
+
+                                    if (!targetInRow) {
+                                      return (
+                                        <span key={charIndex} style={{ color: COLORS.textDark }}>
+                                          {char}
+                                        </span>
+                                      );
+                                    }
+
+                                    let charStyle = { ...STYLES.charNormalBase };
+                                    if (isSelected) {
+                                      charStyle = {
+                                        ...charStyle,
+                                        backgroundColor: COLORS.lightGray,
+                                        border: `1px solid ${COLORS.secondary}`,
+                                        color: COLORS.secondary,
+                                      };
+                                    } else if (isCompleted) {
+                                      charStyle = {
+                                        ...charStyle,
+                                        backgroundColor: COLORS.secondary,
+                                        color: "white",
+                                      };
+                                    } else if (char === "□") {
+                                      charStyle = {
+                                        ...charStyle,
+                                        border: `1px solid ${COLORS.lightGray}`,
+                                      };
+                                    }
+
+                                    return (
+                                      <span key={charIndex} className="inline-flex items-center justify-center" style={charStyle}>
+                                        {selectedChar}
+                                      </span>
+                                    );
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            {/* 번역문 */}
+                            <div>
+                              <p className="text-xs text-gray-600 mb-2">번역문</p>
+                              <div className="p-4 bg-gray-50 rounded border border-gray-200">
+                                <p className="text-base leading-relaxed text-gray-700">
+                                  {isLoadingTranslation ? "번역을 불러오는 중..." : translation[0] || "번역을 불러오는 중..."}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <p className="text-sm text-gray-500">"번역 보기" 버튼을 클릭하여 번역을 확인하세요.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
