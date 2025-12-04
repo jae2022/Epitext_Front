@@ -131,8 +131,7 @@ const DetailPage = ({ item, onBack }) => {
   const [selectedCharacters, setSelectedCharacters] = useState({}); // charId -> selected character
   const [showReasonPopup, setShowReasonPopup] = useState(false);
   const [selectedCharForCluster, setSelectedCharForCluster] = useState(null); // cluster에서 표시할 선택된 글자
-  const [translation, setTranslation] = useState([]); // 번역문 (줄별 배열)
-  const [selectedRowIndex, setSelectedRowIndex] = useState(null); // 번역을 표시할 행 인덱스
+  const [translation, setTranslation] = useState({ original: "", translation: "" }); // 번역문과 원문
   const [isLoadingTranslation, setIsLoadingTranslation] = useState(false); // 번역 로딩 상태
 
   // API에서 데이터 로드
@@ -1051,8 +1050,10 @@ const DetailPage = ({ item, onBack }) => {
                                       setIsLoadingTranslation(true);
                                       previewTranslation(rubbingDetail.id, selectedCharId, candidate.character)
                                         .then((data) => {
-                                          setTranslation([data.translation]);
-                                          setSelectedRowIndex(target.row);
+                                          setTranslation({
+                                            original: data.original || "",
+                                            translation: data.translation || ""
+                                          });
                                         })
                                         .catch((err) => {
                                           console.error("번역 미리보기 실패:", err);
@@ -1135,13 +1136,18 @@ const DetailPage = ({ item, onBack }) => {
                                 data = await getTranslation(rubbingDetail.id, selectedCharId);
                               }
 
-                              setTranslation([data.translation]);
-                              // setSelectedRowIndex는 이제 필요 없지만(백엔드에서 줄을 찾음), UI 유지를 위해 둡니다.
-                              setSelectedRowIndex(target.row);
+                              // [수정] 번역 API가 반환하는 original과 translation을 모두 저장
+                              setTranslation({
+                                original: data.original || "",
+                                translation: data.translation || ""
+                              });
                               
                             } catch (error) {
                               console.error("번역 로드 실패:", error);
-                              setTranslation(["번역을 불러오는데 실패했습니다."]);
+                              setTranslation({
+                                original: "",
+                                translation: "번역을 불러오는데 실패했습니다."
+                              });
                             } finally {
                               setIsLoadingTranslation(false);
                             }
@@ -1157,55 +1163,18 @@ const DetailPage = ({ item, onBack }) => {
                         className="flex-1 overflow-y-auto min-h-0 border border-[#EBEDF8] rounded-[8px]"
                         style={{ padding: "16px 16px 12px 16px" }}
                       >
-                        {translation.length > 0 && selectedRowIndex !== null ? (
+                        {translation.original || translation.translation ? (
                           <div className="flex flex-col gap-4">
                             {/* 원문 */}
                             <div>
                               <p className="text-xs text-gray-600 mb-2">원문</p>
                               <div className="p-4 bg-gray-50 rounded border border-gray-200">
                                 <p className="text-base leading-relaxed" style={STYLES.textContainer}>
-                                  {sampleText[selectedRowIndex]?.split("").map((char, charIndex) => {
-                                    const targetInRow = targetsByRow[selectedRowIndex]?.find((t) => t.char === charIndex);
-                                    const charId = targetInRow ? targetInRow.id : null;
-                                    const isSelected = selectedCharId === charId;
-                                    const isCompleted = charId && checkedChars.has(charId);
-                                    const selectedChar = isCompleted && selectedCharacters[charId] ? selectedCharacters[charId] : char;
-
-                                    if (!targetInRow) {
-                                      return (
-                                        <span key={charIndex} style={{ color: COLORS.textDark }}>
-                                          {char}
-                                        </span>
-                                      );
-                                    }
-
-                                    let charStyle = { ...STYLES.charNormalBase };
-                                    if (isSelected) {
-                                      charStyle = {
-                                        ...charStyle,
-                                        backgroundColor: COLORS.lightGray,
-                                        border: `1px solid ${COLORS.secondary}`,
-                                        color: COLORS.secondary,
-                                      };
-                                    } else if (isCompleted) {
-                                      charStyle = {
-                                        ...charStyle,
-                                        backgroundColor: COLORS.secondary,
-                                        color: "white",
-                                      };
-                                    } else if (char === "□") {
-                                      charStyle = {
-                                        ...charStyle,
-                                        border: `1px solid ${COLORS.lightGray}`,
-                                      };
-                                    }
-
-                                    return (
-                                      <span key={charIndex} className="inline-flex items-center justify-center" style={charStyle}>
-                                        {selectedChar}
-                                      </span>
-                                    );
-                                  })}
+                                  {translation.original.split("").map((char, charIndex) => (
+                                    <span key={charIndex} style={{ color: COLORS.textDark }}>
+                                      {char}
+                                    </span>
+                                  ))}
                                 </p>
                               </div>
                             </div>
@@ -1214,7 +1183,7 @@ const DetailPage = ({ item, onBack }) => {
                               <p className="text-xs text-gray-600 mb-2">번역문</p>
                               <div className="p-4 bg-gray-50 rounded border border-gray-200">
                                 <p className="text-base leading-relaxed text-gray-700">
-                                  {isLoadingTranslation ? "번역을 불러오는 중..." : translation[0] || "번역을 불러오는 중..."}
+                                  {isLoadingTranslation ? "번역을 불러오는 중..." : translation.translation || "번역을 불러오는 중..."}
                                 </p>
                               </div>
                             </div>
