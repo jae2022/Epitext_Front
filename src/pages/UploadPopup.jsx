@@ -1,10 +1,12 @@
 import React, { useState, useRef } from "react";
+import { uploadRubbing } from "../api/requests";
 
 const UploadPopup = ({ onClose, onComplete }) => {
-  const [uploadState, setUploadState] = useState("preset"); // 'preset', 'loading', 'complete'
+  const [uploadState, setUploadState] = useState("preset"); // 'preset', 'uploading', 'processing', 'complete', 'error'
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0);
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadedRubbing, setUploadedRubbing] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
   const fileInputRef = useRef(null);
   const dragAreaRef = useRef(null);
 
@@ -37,45 +39,57 @@ const UploadPopup = ({ onClose, onComplete }) => {
   };
 
   // 파일 처리 및 업로드 시작
-  const handleFiles = (files) => {
+  const handleFiles = async (files) => {
     if (files.length > 0) {
       const file = files[0]; // 첫 번째 파일만 사용
       setUploadedFile(file);
-      startUpload();
+      setErrorMessage(null);
+      await startUpload(file);
     }
   };
 
-  // 업로드 시뮬레이션
-  const startUpload = () => {
-    setUploadState("loading");
-    setUploadProgress(0);
-    setTimeRemaining(10);
+  // 실제 업로드 및 처리
+  const startUpload = async (file) => {
+    try {
+      setUploadState("uploading");
+      setUploadProgress(0);
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setUploadState("complete");
-          return 100;
-        }
-        return prev + 2;
-      });
-
-      setTimeRemaining((prev) => {
-        if (prev <= 0) {
-          return 0;
-        }
-        return Math.max(0, prev - 0.2);
-      });
-    }, 200);
+      // 파일 업로드 (FormData)
+      const response = await uploadRubbing(file);
+      
+      setUploadProgress(50);
+      setUploadedRubbing(response);
+      
+      // 업로드 완료, 이제 AI 처리 중
+      setUploadState("processing");
+      setUploadProgress(75);
+      
+      // 백엔드에서 동기적으로 처리하므로 응답이 오면 완료
+      // 실제로는 비동기 처리일 수 있으므로 상태 확인 필요
+      setUploadState("complete");
+      setUploadProgress(100);
+      
+    } catch (error) {
+      console.error("업로드 실패:", error);
+      setUploadState("error");
+      setErrorMessage(
+        error.response?.data?.error || 
+        error.message || 
+        "파일 업로드에 실패했습니다."
+      );
+    }
   };
 
-  // 취소 버튼
+  // 취소 버튼 (업로드 중일 때만)
   const handleCancel = () => {
-    setUploadState("preset");
-    setUploadProgress(0);
-    setTimeRemaining(0);
-    setUploadedFile(null);
+    if (uploadState === "uploading" || uploadState === "processing") {
+      // 업로드 취소는 실제로는 서버에서 처리 중이므로 완료될 때까지 기다려야 함
+      // 여기서는 상태만 리셋
+      setUploadState("preset");
+      setUploadProgress(0);
+      setUploadedFile(null);
+      setUploadedRubbing(null);
+    }
   };
 
   // 파일 삭제 (X 버튼)
@@ -88,20 +102,9 @@ const UploadPopup = ({ onClose, onComplete }) => {
 
   // 완료 버튼 클릭
   const handleFinish = () => {
-    if (uploadState === "complete" && uploadedFile && onComplete) {
-      // 현재 날짜를 YYYY.MM.DD 형식으로 생성
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
-      const dateString = `${year}.${month}.${day}`;
-
-      // 새 항목 추가
-      onComplete({
-        fileName: uploadedFile.name,
-        uploadDate: dateString,
-        file: uploadedFile, // 파일 객체도 함께 전달
-      });
+    if (uploadState === "complete" && uploadedRubbing && onComplete) {
+      // 업로드된 탁본 정보를 전달
+      onComplete(uploadedRubbing);
     }
     onClose();
   };
@@ -176,26 +179,48 @@ const UploadPopup = ({ onClose, onComplete }) => {
               </>
             )}
 
-            {/* Loading 상태: 업로드 진행 바 */}
-            {uploadState === "loading" && (
+            {/* Uploading 상태: 파일 업로드 중 */}
+            {(uploadState === "uploading" || uploadState === "processing") && (
               <div className="border border-[#c0c5dc] rounded-[8px] h-[80px] relative mb-4 overflow-hidden">
-                {/* 진행 바 배경 (gray3 색으로 채워짐) */}
-                <div className="bg-gray-3 h-full rounded-l-[8px] transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                {/* 진행 바 배경 */}
+                <div className="bg-[#FCE3D9] h-full rounded-l-[8px] transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                 {/* 텍스트 및 버튼 */}
                 <div className="absolute inset-0 flex items-center justify-between px-6">
                   <div className="flex flex-col">
-                    <p className="text-[14px] font-semibold text-[#2a2a3a]">Uploading...</p>
+                    <p className="text-[14px] font-semibold text-[#2a2a3a]">
+                      {uploadState === "uploading" ? "업로드 중..." : "AI 처리 중..."}
+                    </p>
                     <p className="text-[12px] font-semibold text-[#7f85a3]">
-                      {Math.round(uploadProgress)}%・{Math.ceil(timeRemaining)}초 남음
+                      {uploadState === "uploading" 
+                        ? "파일을 서버에 업로드하고 있습니다..."
+                        : "전처리 → OCR → NLP → Swin → 복원 로직 실행 중..."}
                     </p>
                   </div>
-                  <button onClick={handleCancel} className="w-6 h-6 hover:opacity-70 transition-opacity flex-shrink-0">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="12" cy="12" r="10" stroke="#2A2A3A" strokeWidth="2" />
-                      <path d="M15 9L9 15M9 9L15 15" stroke="#2A2A3A" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  </button>
+                  {(uploadState === "uploading") && (
+                    <button onClick={handleCancel} className="w-6 h-6 hover:opacity-70 transition-opacity flex-shrink-0">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" stroke="#2A2A3A" strokeWidth="2" />
+                        <path d="M15 9L9 15M9 9L15 15" stroke="#2A2A3A" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
+              </div>
+            )}
+
+            {/* Error 상태 */}
+            {uploadState === "error" && (
+              <div className="border border-red-300 rounded-[8px] h-[80px] relative mb-4 flex items-center justify-between px-6 bg-red-50">
+                <div className="flex flex-col">
+                  <p className="text-[14px] font-semibold text-red-600">업로드 실패</p>
+                  <p className="text-[12px] text-red-500">{errorMessage}</p>
+                </div>
+                <button onClick={handleDeleteFile} className="w-6 h-6 hover:opacity-70 transition-opacity flex-shrink-0">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="#DC2626" strokeWidth="2" />
+                    <path d="M15 9L9 15M9 9L15 15" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
               </div>
             )}
 
@@ -219,9 +244,16 @@ const UploadPopup = ({ onClose, onComplete }) => {
           {/* 완료 버튼 - 하단 고정 */}
           <button
             onClick={handleFinish}
-            className="w-full h-[48px] bg-[#ee7542] rounded-[6px] flex items-center justify-center hover:bg-[#d66438] transition-colors mt-auto"
+            disabled={uploadState !== "complete"}
+            className={`w-full h-[48px] rounded-[6px] flex items-center justify-center transition-colors mt-auto ${
+              uploadState === "complete"
+                ? "bg-[#ee7542] hover:bg-[#d66438]"
+                : "bg-gray-300 cursor-not-allowed"
+            }`}
           >
-            <span className="text-white text-[16px] font-bold">완료</span>
+            <span className={`text-[16px] font-bold ${uploadState === "complete" ? "text-white" : "text-gray-500"}`}>
+              {uploadState === "complete" ? "완료" : uploadState === "processing" ? "처리 중..." : "완료"}
+            </span>
           </button>
         </div>
       </div>

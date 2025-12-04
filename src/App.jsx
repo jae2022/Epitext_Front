@@ -34,20 +34,22 @@ function App() {
   };
 
   // 업로드 완료 처리
-  const handleUploadComplete = async (uploadData) => {
+  const handleUploadComplete = async (rubbingData) => {
     try {
-      const file = uploadData.file;
-      if (!file) {
-        alert("파일을 선택해주세요.");
+      if (!rubbingData || !rubbingData.id) {
+        console.error("업로드된 탁본 데이터가 없습니다.");
         return;
       }
 
-      await uploadRubbing(file);
+      // 업로드 완료 후 목록 새로고침
       setShowUploadPopup(false);
       triggerRefresh(); // ListPage 새로고침
+      
+      // 업로드된 탁본의 상세 페이지로 이동 (선택사항)
+      // setSelectedItem(rubbingData);
     } catch (err) {
-      console.error("업로드 실패:", err);
-      alert("파일 업로드에 실패했습니다.");
+      console.error("업로드 완료 처리 실패:", err);
+      alert("업로드 완료 처리에 실패했습니다.");
     }
   };
 
