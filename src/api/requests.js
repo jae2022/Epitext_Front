@@ -24,7 +24,7 @@ const formatProcessingTime = (seconds) => {
 
 /**
  * 탁본 목록 조회
- * @param {string|null} status - 필터링할 상태 ("복원 완료", "복원 진행중" 등)
+ * @param {string|null} status - 필터링할 상태 ("completed", "in_progress" 등)
  * @returns {Promise} 탁본 목록 데이터
  */
 export const getRubbingList = async (status = null) => {
@@ -32,20 +32,24 @@ export const getRubbingList = async (status = null) => {
     const params = status ? { status } : {};
     const response = await apiClient.get("/api/rubbings", { params });
 
-    // 백엔드 응답을 프론트엔드 형식으로 변환
-    const formattedData = response.data.map((item) => ({
+    // 백엔드가 이미 포맷팅된 데이터를 반환하므로 그대로 사용
+    // 필요시 추가 변환만 수행
+    console.log("📦 백엔드 응답 데이터:", response.data);
+    const formattedData = (response.data || []).map((item) => ({
       id: item.id,
-      status: item.status,
-      date: formatDate(item.created_at),
+      status: item.status || "처리중",
+      date: item.created_at || "-",
       restorationStatus: item.restoration_status || "-",
-      processingTime: formatProcessingTime(item.processing_time),
-      damageLevel: item.damage_level ? `${item.damage_level}%` : "-",
+      processingTime: item.processing_time || "-",
+      damageLevel: item.damage_level || "-",
       inspectionStatus: item.inspection_status || "-",
-      reliability: item.average_reliability ? `${item.average_reliability}%` : "-",
-      is_completed: item.is_completed,
+      reliability: item.average_reliability || "-",
+      is_completed: item.is_completed || false,
       image_url: item.image_url,
       filename: item.filename,
+      index: item.index, // 테이블 번호
     }));
+    console.log("✅ 변환된 데이터:", formattedData);
 
     return formattedData;
   } catch (error) {

@@ -1,147 +1,53 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import ReasoningCluster from "../components/ReasoningCluster";
 import {
-  mockRubbingDetail,
-  mockRubbingStatistics,
-  mockRestorationTargets,
-  generateMockCandidates,
   formatDate,
   formatProcessingTime,
 } from "../mocks/mockData";
-import { getTranslation, previewTranslation } from "../api/requests";
+import { 
+  getRubbingDetail, 
+  getRestorationTargets, 
+  getCandidates, 
+  getReasoning,
+  getTranslation, 
+  previewTranslation 
+} from "../api/requests";
 
-// 복원 대상 글자 위치 데이터 생성 (mockRestorationTargets를 사용하되, 기존 형식과 호환되도록 변환)
-const generateRestorationTargets = () => {
-  // mockRestorationTargets는 함수이므로 호출해야 함
-  const targets =
-    typeof mockRestorationTargets === "function"
-      ? mockRestorationTargets(mockRubbingDetail.text_content_with_punctuation || mockRubbingDetail.text_content)
-      : mockRestorationTargets;
-
-  // 기존 형식으로 변환
-  return targets.map((target) => ({
-    id: target.id,
-    position: target.position,
-    row: target.row_index,
-    char: target.char_index,
-  }));
-};
-
-const restorationTargets = generateRestorationTargets();
-
-// 후보 데이터 생성 (mockData의 generateMockCandidates 사용)
-// 교집합 처리: 획 일치도와 문맥 일치도 둘 다 존재하는 후보만 표시
-// 교집합이 5개 미만일 경우 null로 채워서 항상 5개 유지
-const generateCandidateData = () => {
-  const data = {};
-  restorationTargets.forEach((target) => {
+// 유틸리티 함수: 텍스트 내용을 배열로 변환
+const ensureArray = (text) => {
+  if (!text) return [];
+  if (Array.isArray(text)) return text;
+  if (typeof text === 'string') {
     try {
-      const candidates = generateMockCandidates(target.id);
-
-      // candidates가 없거나 all이 없으면 빈 배열로 처리
-      if (!candidates || !candidates.all || candidates.all.length === 0) {
-        // 빈 후보 배열 생성 (5개 null로 채움)
-        data[target.id] = Array(5)
-          .fill(null)
-          .map(() => ({
-            character: null,
-            strokeMatch: null,
-            contextMatch: null,
-            reliability: null,
-            checked: false,
-          }));
-        data[`${target.id}_all`] = [];
-        return;
-      }
-
-      // 전체 후보 데이터 (시각화용)
-      data[`${target.id}_all`] = candidates.all.map((c) => ({
-        character: c.character,
-        strokeMatch: c.stroke_match,
-        contextMatch: c.context_match,
-        reliability: `${c.reliability}%`,
-        checked: false,
-      }));
-
-      // 교집합 계산: 획 일치도와 문맥 일치도 둘 다 존재하는 후보
-      const intersection = candidates.all.filter((c) => c.stroke_match !== null && c.context_match !== null);
-
-      const top5Intersection = [];
-
-      if (intersection.length > 0) {
-        // 교집합이 있는 경우: F1 Score(전체 신뢰도) 기준으로 정렬
-        const sortedIntersection = [...intersection].sort((a, b) => b.reliability - a.reliability);
-
-        // 상위 5개 선택 (5개 미만이면 null로 채움)
-        for (let i = 0; i < 5; i++) {
-          if (i < sortedIntersection.length) {
-            top5Intersection.push({
-              character: sortedIntersection[i].character,
-              strokeMatch: sortedIntersection[i].stroke_match,
-              contextMatch: sortedIntersection[i].context_match,
-              reliability: `${sortedIntersection[i].reliability}%`, // F1 Score
-              checked: false,
-            });
-          } else {
-            // null로 채움
-            top5Intersection.push({
-              character: null,
-              strokeMatch: null,
-              contextMatch: null,
-              reliability: null,
-              checked: false,
-            });
-          }
-        }
-      } else {
-        // 교집합이 없는 경우: 문맥 일치도만 있는 후보들을 문맥 일치도 기준으로 정렬
-        const contextOnly = candidates.all
-          .filter((c) => c.stroke_match === null && c.context_match !== null)
-          .sort((a, b) => b.context_match - a.context_match);
-
-        // 상위 5개 선택 (5개 미만이면 null로 채움)
-        for (let i = 0; i < 5; i++) {
-          if (i < contextOnly.length) {
-            top5Intersection.push({
-              character: contextOnly[i].character,
-              strokeMatch: null, // 획 일치도 없음
-              contextMatch: contextOnly[i].context_match,
-              reliability: `${contextOnly[i].context_match}%`, // 문맥 일치도가 전체 신뢰도
-              checked: false,
-            });
-          } else {
-            // null로 채움
-            top5Intersection.push({
-              character: null,
-              strokeMatch: null,
-              contextMatch: null,
-              reliability: null,
-              checked: false,
-            });
-          }
-        }
-      }
-
-      data[target.id] = top5Intersection;
-    } catch (error) {
-      console.error(`Error generating candidates for target ${target.id}:`, error);
-      // 에러 발생 시 빈 후보 배열 생성
-      data[target.id] = Array(5)
-        .fill(null)
-        .map(() => ({
-          character: null,
-          strokeMatch: null,
-          contextMatch: null,
-          reliability: null,
-          checked: false,
-        }));
-      data[`${target.id}_all`] = [];
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return text.split('\n').filter(line => line.trim());
     }
-  });
-  return data;
+  }
+  return [];
 };
 
-const candidateData = generateCandidateData();
+// [MASK] 텍스트를 파싱하여 □로 보여주면서도 데이터 처리가 가능하게 함
+const processTextForDisplay = (textArray) => {
+  if (!textArray || !Array.isArray(textArray)) return [];
+  
+  return textArray.map(line => {
+    // [MASK1], [MASK2] 등을 모두 □로 치환
+    return line.replace(/\[MASK\d*\]/g, "□");
+  });
+};
+
+// 이미지 URL 해결 함수
+const resolveImageUrl = (imageUrl) => {
+  if (!imageUrl) return '';
+  if (imageUrl.startsWith('http')) return imageUrl;
+  if (imageUrl.startsWith('/')) {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    return `${baseUrl}${imageUrl}`;
+  }
+  return imageUrl;
+};
 
 // 상수 정의
 const COLORS = {
@@ -208,29 +114,180 @@ const STYLES = {
 };
 
 const DetailPage = ({ item, onBack }) => {
-  // Mock 데이터 사용 (실제로는 props나 API에서 받아옴)
-  // 구두점 복원 모델 적용된 텍스트 사용 (쉼표, 마침표 등 포함)
-  const sampleText = mockRubbingDetail.text_content_with_punctuation || mockRubbingDetail.text_content;
-  const rubbingDetail = mockRubbingDetail;
-  const statistics = mockRubbingStatistics;
-
+  const rubbingId = item?.id;
+  
+  // 상태 관리
+  const [rubbingDetail, setRubbingDetail] = useState(null);
+  const [statistics, setStatistics] = useState(null);
+  const [restorationTargets, setRestorationTargets] = useState([]);
+  const [candidates, setCandidates] = useState({});
+  const [allCandidates, setAllCandidates] = useState({});
+  const [reasoningData, setReasoningData] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
   const [selectedCharId, setSelectedCharId] = useState(null);
   const [checkedChars, setCheckedChars] = useState(new Set()); // Set으로 변경하여 O(1) 조회
-  const [candidates, setCandidates] = useState(candidateData);
-  const [allCandidates, setAllCandidates] = useState(() => {
-    // 전체 후보 데이터 (Vision 10개, NLP 10개)
-    const all = {};
-    restorationTargets.forEach((target) => {
-      all[target.id] = candidateData[`${target.id}_all`] || candidateData[target.id];
-    });
-    return all;
-  });
   const [selectedCharacters, setSelectedCharacters] = useState({}); // charId -> selected character
   const [showReasonPopup, setShowReasonPopup] = useState(false);
   const [selectedCharForCluster, setSelectedCharForCluster] = useState(null); // cluster에서 표시할 선택된 글자
-  const [translation, setTranslation] = useState([]); // 번역문 (줄별 배열)
-  const [selectedRowIndex, setSelectedRowIndex] = useState(null); // 번역을 표시할 행 인덱스
+  const [translation, setTranslation] = useState({ original: "", translation: "", selectedCharIndex: -1 }); // 번역문과 원문, 선택된 글자 인덱스
   const [isLoadingTranslation, setIsLoadingTranslation] = useState(false); // 번역 로딩 상태
+
+  // API에서 데이터 로드
+  useEffect(() => {
+    if (!rubbingId) {
+      setError("탁본 ID가 없습니다.");
+      setIsLoading(false);
+      return;
+    }
+
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // 병렬로 데이터 로드
+        const [detailData, targetsData] = await Promise.all([
+          getRubbingDetail(rubbingId),
+          getRestorationTargets(rubbingId),
+        ]);
+
+        setRubbingDetail(detailData);
+        setStatistics(detailData.statistics || null);
+        
+        // 복원 대상 데이터 변환
+        const formattedTargets = targetsData.map((target) => ({
+          id: target.id,
+          position: target.position,
+          row: target.row_index,
+          char: target.char_index,
+        }));
+        setRestorationTargets(formattedTargets);
+
+        // 각 복원 대상의 후보 데이터 로드
+        const candidatesMap = {};
+        const allCandidatesMap = {};
+        const reasoningMap = {};
+
+        for (const target of targetsData) {
+          try {
+            // 후보 데이터 로드
+            const candidatesResponse = await getCandidates(rubbingId, target.id);
+            const top5 = candidatesResponse.top5 || [];
+            const all = candidatesResponse.all || [];
+
+            // Top-5 후보 변환
+            candidatesMap[target.id] = top5.map((c) => ({
+              character: c.character,
+              strokeMatch: c.stroke_match,
+              contextMatch: c.context_match,
+              reliability: c.reliability !== null && c.reliability !== undefined 
+                ? `${parseFloat(c.reliability).toFixed(1)}%` 
+                : null,
+              checked: false,
+            }));
+
+            // 전체 후보 변환
+            allCandidatesMap[target.id] = all.map((c) => ({
+              character: c.character,
+              strokeMatch: c.stroke_match,
+              contextMatch: c.context_match,
+              reliability: c.reliability !== null && c.reliability !== undefined 
+                ? `${parseFloat(c.reliability).toFixed(1)}%` 
+                : null,
+            }));
+
+            // 유추 근거 데이터 로드
+            const reasoningResponse = await getReasoning(rubbingId, target.id);
+            reasoningMap[target.id] = reasoningResponse;
+          } catch (err) {
+            console.error(`Failed to load candidates for target ${target.id}:`, err);
+            // 에러 발생 시 빈 배열
+            candidatesMap[target.id] = Array(5).fill(null).map(() => ({
+              character: null,
+              strokeMatch: null,
+              contextMatch: null,
+              reliability: null,
+              checked: false,
+            }));
+            allCandidatesMap[target.id] = [];
+          }
+        }
+
+        setCandidates(candidatesMap);
+        setAllCandidates(allCandidatesMap);
+        setReasoningData(reasoningMap);
+      } catch (err) {
+        console.error("Failed to load detail data:", err);
+        // 더 자세한 에러 메시지
+        let errorMessage = "데이터를 불러오는데 실패했습니다.";
+        if (err.response) {
+          // 서버가 응답했지만 에러 상태 코드
+          errorMessage = `서버 오류 (${err.response.status}): ${err.response.data?.error || err.response.statusText}`;
+        } else if (err.request) {
+          // 요청은 보냈지만 응답이 없음
+          errorMessage = "서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.";
+        } else {
+          // 요청 설정 중 에러
+          errorMessage = err.message || errorMessage;
+        }
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [rubbingId]);
+
+  // 텍스트 내용 처리
+  // 검수 UI에서 줄바꿈이 적용된 '구두점 복원 텍스트'를 우선 사용
+  // 데이터가 없으면 원본 텍스트 사용
+  const sampleText = useMemo(() => {
+    if (!rubbingDetail) return [];
+    const textToUse = rubbingDetail.text_content_with_punctuation || rubbingDetail.text_content;
+    const rawTextLines = ensureArray(textToUse);
+    return processTextForDisplay(rawTextLines);
+  }, [rubbingDetail]);
+
+  // 순서 기반 매핑 테이블 생성 및 화면상 위치 계산
+  // 텍스트의 □ 순서와 DB의 Target을 매칭하고, '화면상 위치'를 계산합니다.
+  const { targetMap, visualPosMap } = useMemo(() => {
+    const map = {};       // 텍스트 클릭용 (key: "행-열", value: target)
+    const posMap = {};    // 버튼 표시용 (key: target.id, value: "N행 M자")
+    
+    let maskCounter = 0;
+    
+    // ID순으로 정렬 (텍스트의 □ 순서와 일치시킴)
+    const sortedTargets = [...restorationTargets].sort((a, b) => a.id - b.id);
+
+    // sampleText(화면에 보이는 줄바꿈된 텍스트)를 순회하며 위치 재계산
+    sampleText.forEach((line, rowIndex) => {
+      const chars = line.split("");
+      let charIndexInLine = 0; // 한글/한자/문장부호 포함한 실제 인덱스
+
+      chars.forEach((char) => {
+        // 텍스트 렌더링 로직과 동일하게 인덱싱
+        if (char === "□") {
+          if (maskCounter < sortedTargets.length) {
+            const target = sortedTargets[maskCounter];
+            
+            // 1. 텍스트 클릭을 위한 매핑
+            map[`${rowIndex}-${charIndexInLine}`] = target;
+            
+            // 2. [핵심] 버튼에 표시할 '화면상 위치' 계산 (1부터 시작)
+            posMap[target.id] = `${rowIndex + 1}행 ${charIndexInLine + 1}자`;
+            
+            maskCounter++;
+          }
+        }
+        charIndexInLine++;
+      });
+    });
+    
+    return { targetMap: map, visualPosMap: posMap };
+  }, [sampleText, restorationTargets]);
 
   const handleCharClick = useCallback((charId) => {
     setSelectedCharId((prev) => (prev === charId ? null : charId));
@@ -280,16 +337,19 @@ const DetailPage = ({ item, onBack }) => {
   );
 
   const inspectionCount = checkedChars.size;
-  const totalInspectionTargets = statistics.restoration_targets; // 검수 대상 글자 수
+  // 검수 대상 글자 수는 복원 대상 글자 수와 동일
+  const totalInspectionTargets = statistics?.restoration_targets || restorationTargets.length || 0;
 
   // 신뢰도 통계 계산
   const reliabilityStats = useMemo(() => {
     const selectedReliabilities = Array.from(checkedChars)
       .map((charId) => {
         const checkedCandidate = candidates[charId]?.find((c) => c.checked);
-        return checkedCandidate ? parseFloat(checkedCandidate.reliability) : null;
+        if (!checkedCandidate || !checkedCandidate.reliability) return null;
+        const relStr = checkedCandidate.reliability.replace('%', '');
+        return parseFloat(relStr);
       })
-      .filter(Boolean); // null 값 제거
+      .filter((val) => val !== null && !isNaN(val)); // null 및 NaN 값 제거
 
     if (selectedReliabilities.length === 0) {
       return { average: "-", max: "-", min: "-" };
@@ -313,7 +373,36 @@ const DetailPage = ({ item, onBack }) => {
       grouped[target.row].push(target);
     });
     return grouped;
-  }, []);
+  }, [restorationTargets]);
+
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-auto flex items-center justify-center" style={{ backgroundColor: COLORS.lightGray }}>
+        <div className="text-center">
+          <div className="text-lg text-gray-600 mb-2">데이터를 불러오는 중...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // 에러 상태
+  if (error || !rubbingDetail) {
+    return (
+      <div className="flex-1 overflow-auto flex items-center justify-center" style={{ backgroundColor: COLORS.lightGray }}>
+        <div className="text-center">
+          <div className="text-lg text-red-600 mb-2">오류가 발생했습니다.</div>
+          <div className="text-sm text-gray-500 mb-4">{error || "데이터를 찾을 수 없습니다."}</div>
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+          >
+            돌아가기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto" style={{ backgroundColor: COLORS.lightGray }}>
@@ -347,13 +436,13 @@ const DetailPage = ({ item, onBack }) => {
               <div className="flex gap-6">
                 <div className="w-[238px] h-[187px] bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                   <img
-                    src="/귀법사적소수좌현응묘지명.png"
+                    src={resolveImageUrl(rubbingDetail.image_url)}
                     alt="탁본 이미지"
                     className="w-full h-full object-contain"
                     onError={(e) => {
                       // 이미지 로드 실패 시 대체 텍스트 표시
                       e.target.style.display = "none";
-                      e.target.parentElement.innerHTML = '<span class="text-gray-400">이미지</span>';
+                      e.target.parentElement.innerHTML = '<span class="text-gray-400">이미지 없음</span>';
                     }}
                   />
                 </div>
@@ -369,7 +458,7 @@ const DetailPage = ({ item, onBack }) => {
                         marginBottom: "8px",
                       }}
                     >
-                      파일명: 귀법사적소수좌현응묘지명.jpg
+                      파일명: {rubbingDetail.filename || "-"}
                     </p>
                     <div
                       style={{
@@ -390,17 +479,17 @@ const DetailPage = ({ item, onBack }) => {
                             })}`
                           : "-"}
                       </p>
-                      <p style={{ margin: 0 }}>총 처리 시간: {formatProcessingTime(rubbingDetail.total_processing_time)}</p>
+                      <p style={{ margin: 0 }}>총 처리 시간: {formatProcessingTime(rubbingDetail.total_processing_time || 0)}</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    {rubbingDetail.font_types.map((font, index) => (
+                  <div className="flex gap-2 flex-wrap">
+                    {(rubbingDetail.font_types || []).map((font, index) => (
                       <div key={index} className="px-4 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">
                         {font}
                       </div>
                     ))}
                     <div className="px-4 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">
-                      탁본 손상 정도 {rubbingDetail.damage_percentage}%
+                      탁본 손상 정도 {rubbingDetail.damage_percentage || 0}%
                     </div>
                   </div>
                 </div>
@@ -423,7 +512,7 @@ const DetailPage = ({ item, onBack }) => {
                         fill="none"
                         stroke="#EE7542"
                         strokeWidth="16"
-                        strokeDasharray={`${2 * Math.PI * 65 * (statistics.restoration_percentage / 100)} ${2 * Math.PI * 65}`}
+                        strokeDasharray={`${2 * Math.PI * 65 * ((statistics?.restoration_percentage || 0) / 100)} ${2 * Math.PI * 65}`}
                         strokeDashoffset="0"
                         strokeLinecap="round"
                       />
@@ -431,7 +520,7 @@ const DetailPage = ({ item, onBack }) => {
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center">
                         <p className="text-sm text-gray-600">복원 대상</p>
-                        <p className="text-lg font-semibold text-[#ee7542]">{statistics.restoration_percentage}%</p>
+                        <p className="text-lg font-semibold text-[#ee7542]">{statistics?.restoration_percentage || 0}%</p>
                       </div>
                     </div>
                   </div>
@@ -449,19 +538,19 @@ const DetailPage = ({ item, onBack }) => {
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">전체 글자 수</p>
-                    <p className="text-base font-semibold">{statistics.total_characters}자</p>
+                    <p className="text-base font-semibold">{statistics?.total_characters || 0}자</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">복원 대상 글자 수</p>
-                    <p className="text-base font-semibold">{statistics.restoration_targets}자</p>
+                    <p className="text-base font-semibold">{statistics?.restoration_targets || 0}자</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">탁본 글자 부분 훼손</p>
-                    <p className="text-base font-semibold">{statistics.partial_damage}자</p>
+                    <p className="text-base font-semibold">{statistics?.partial_damage || 0}자</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">탁본 글자 완전 훼손</p>
-                    <p className="text-base font-semibold">{statistics.complete_damage}자</p>
+                    <p className="text-base font-semibold">{statistics?.complete_damage || 0}자</p>
                   </div>
                 </div>
               </div>
@@ -512,7 +601,7 @@ const DetailPage = ({ item, onBack }) => {
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">검수 대상 글자 수</p>
-                    <p className="text-base font-semibold">78자</p>
+                    <p className="text-base font-semibold">{statistics?.restoration_targets || 0}자</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">평균 신뢰도</p>
@@ -593,7 +682,7 @@ const DetailPage = ({ item, onBack }) => {
                       className={buttonClass}
                       style={{ width: "fit-content", minWidth: "88px", ...buttonStyle }}
                     >
-                      {target.position}
+                      {visualPosMap[target.id] || target.position}
                     </button>
                   );
                 })}
@@ -606,15 +695,19 @@ const DetailPage = ({ item, onBack }) => {
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {sampleText.map((text, rowIndex) => {
-                    const targetsInRow = targetsByRow[rowIndex] || [];
-                    const selectedTargetInRow = targetsInRow.find((t) => t.id === selectedCharId);
-                    const showTable = selectedTargetInRow && candidates[selectedCharId] && candidates[selectedCharId].length > 0;
+                    // 해당 행에 선택된 타겟이 있는지 확인 (테이블 표시용)
+                    const isRowSelected = text.split("").some((_, charIndex) => {
+                      const target = targetMap[`${rowIndex}-${charIndex}`];
+                      return target?.id === selectedCharId;
+                    });
+                    const showTable = isRowSelected && candidates[selectedCharId] && candidates[selectedCharId].length > 0;
 
                     return (
-                      <div key={rowIndex}>
+                      <div key={rowIndex} style={{ marginBottom: "12px" }}>
                         <div className="text-base mb-0 font-medium" style={STYLES.textContainer}>
                           {text.split("").map((char, charIndex) => {
-                            const target = targetsInRow.find((t) => t.char === charIndex);
+                            // 순서 기반 매핑: targetMap을 통해 타겟 조회
+                            const target = targetMap[`${rowIndex}-${charIndex}`];
                             const charId = target ? target.id : null;
                             const isSelected = selectedCharId === charId;
                             const isCompleted = charId && checkedChars.has(charId);
@@ -664,7 +757,12 @@ const DetailPage = ({ item, onBack }) => {
                             }
 
                             return (
-                              <span key={charIndex} className={charClass} onClick={() => handleCharClick(charId)} style={charStyle}>
+                              <span 
+                                key={charIndex} 
+                                className={charClass} 
+                                onClick={() => charId && handleCharClick(charId)} 
+                                style={charStyle}
+                              >
                                 {selectedChar}
                               </span>
                             );
@@ -865,17 +963,19 @@ const DetailPage = ({ item, onBack }) => {
                       data={{
                         name: "Source Image",
                         type: "root",
-                        imgUrl: `/images/rubbings/cropped/rubbing_${rubbingDetail.id}_target_${selectedCharId}.jpg`, // 탁본 이미지에서 해당 글자 부분 크롭한 이미지 URL (백엔드에서 제공)
+                        imgUrl: reasoningData[selectedCharId]?.imgUrl 
+                          ? resolveImageUrl(reasoningData[selectedCharId].imgUrl)
+                          : `/images/rubbings/processed/cropped/rubbing_${rubbingId}_target_${selectedCharId}.jpg`,
                         children: [
                           {
                             name: "Vision Model (Swin)",
                             type: "model",
-                            children: allCandidates[selectedCharId]
-                              .filter((c) => c.strokeMatch !== null) // Vision은 strokeMatch가 있는 것만
-                              .sort((a, b) => (b.strokeMatch || 0) - (a.strokeMatch || 0)) // strokeMatch 기준 내림차순 정렬
+                            children: (reasoningData[selectedCharId]?.vision || allCandidates[selectedCharId]
+                              .filter((c) => c.strokeMatch !== null && c.strokeMatch !== undefined))
+                              .slice(0, 10)
                               .map((c, idx) => ({
-                                name: c.character,
-                                score: c.strokeMatch / 100,
+                                name: c.character || c.hanja,
+                                score: (c.strokeMatch || c.stroke_match || 0) / 100,
                                 id: `v${idx}`,
                                 type: "leaf",
                               })),
@@ -883,11 +983,12 @@ const DetailPage = ({ item, onBack }) => {
                           {
                             name: "NLP Model (RoBERTa)",
                             type: "model",
-                            children: [...allCandidates[selectedCharId]]
-                              .sort((a, b) => b.contextMatch - a.contextMatch) // contextMatch 기준 내림차순 정렬
+                            children: (reasoningData[selectedCharId]?.nlp || allCandidates[selectedCharId]
+                              .filter((c) => c.contextMatch !== null && c.contextMatch !== undefined))
+                              .slice(0, 10)
                               .map((c, idx) => ({
-                                name: c.character,
-                                score: c.contextMatch / 100,
+                                name: c.character || c.hanja,
+                                score: (c.contextMatch || c.context_match || 0) / 100,
                                 id: `n${idx}`,
                                 type: "leaf",
                               })),
@@ -897,7 +998,7 @@ const DetailPage = ({ item, onBack }) => {
                       selectedChar={selectedCharForCluster}
                       selectedReliability={
                         selectedCharForCluster
-                          ? candidates[selectedCharId].find((c) => c.character === selectedCharForCluster)?.reliability
+                          ? candidates[selectedCharId]?.find((c) => c.character === selectedCharForCluster)?.reliability
                           : null
                       }
                       height={400}
@@ -949,8 +1050,11 @@ const DetailPage = ({ item, onBack }) => {
                                       setIsLoadingTranslation(true);
                                       previewTranslation(rubbingDetail.id, selectedCharId, candidate.character)
                                         .then((data) => {
-                                          setTranslation([data.translation]);
-                                          setSelectedRowIndex(target.row);
+                                          setTranslation({
+                                            original: data.original || "",
+                                            translation: data.translation || "",
+                                            selectedCharIndex: data.selected_char_index !== undefined ? data.selected_char_index : -1
+                                          });
                                         })
                                         .catch((err) => {
                                           console.error("번역 미리보기 실패:", err);
@@ -1021,12 +1125,32 @@ const DetailPage = ({ item, onBack }) => {
 
                             setIsLoadingTranslation(true);
                             try {
-                              const data = await getTranslation(rubbingDetail.id, selectedCharId);
-                              setTranslation([data.translation]);
-                              setSelectedRowIndex(target.row);
+                              let data;
+                              
+                              // [수정됨] 사용자가 선택한 후보(selectedCharForCluster)가 있으면 '미리보기 API' 호출
+                              if (selectedCharForCluster) {
+                                console.log("선택된 글자로 번역:", selectedCharForCluster);
+                                data = await previewTranslation(rubbingDetail.id, selectedCharId, selectedCharForCluster);
+                              } else {
+                                // 선택된 후보가 없으면 '기본 번역 API' 호출 (원본 □ 유지)
+                                console.log("원본 텍스트 번역");
+                                data = await getTranslation(rubbingDetail.id, selectedCharId);
+                              }
+
+                              // [수정] 번역 API가 반환하는 original, translation, selectedCharIndex를 모두 저장
+                              setTranslation({
+                                original: data.original || "",
+                                translation: data.translation || "",
+                                selectedCharIndex: data.selected_char_index !== undefined ? data.selected_char_index : -1
+                              });
+                              
                             } catch (error) {
                               console.error("번역 로드 실패:", error);
-                              setTranslation(["번역을 불러오는데 실패했습니다."]);
+                              setTranslation({
+                                original: "",
+                                translation: "번역을 불러오는데 실패했습니다.",
+                                selectedCharIndex: -1
+                              });
                             } finally {
                               setIsLoadingTranslation(false);
                             }
@@ -1042,52 +1166,30 @@ const DetailPage = ({ item, onBack }) => {
                         className="flex-1 overflow-y-auto min-h-0 border border-[#EBEDF8] rounded-[8px]"
                         style={{ padding: "16px 16px 12px 16px" }}
                       >
-                        {translation.length > 0 && selectedRowIndex !== null ? (
+                        {translation.original || translation.translation ? (
                           <div className="flex flex-col gap-4">
                             {/* 원문 */}
                             <div>
                               <p className="text-xs text-gray-600 mb-2">원문</p>
                               <div className="p-4 bg-gray-50 rounded border border-gray-200">
                                 <p className="text-base leading-relaxed" style={STYLES.textContainer}>
-                                  {sampleText[selectedRowIndex]?.split("").map((char, charIndex) => {
-                                    const targetInRow = targetsByRow[selectedRowIndex]?.find((t) => t.char === charIndex);
-                                    const charId = targetInRow ? targetInRow.id : null;
-                                    const isSelected = selectedCharId === charId;
-                                    const isCompleted = charId && checkedChars.has(charId);
-                                    const selectedChar = isCompleted && selectedCharacters[charId] ? selectedCharacters[charId] : char;
-
-                                    if (!targetInRow) {
-                                      return (
-                                        <span key={charIndex} style={{ color: COLORS.textDark }}>
-                                          {char}
-                                        </span>
-                                      );
-                                    }
-
-                                    let charStyle = { ...STYLES.charNormalBase };
-                                    if (isSelected) {
-                                      charStyle = {
-                                        ...charStyle,
-                                        backgroundColor: COLORS.lightGray,
-                                        border: `1px solid ${COLORS.secondary}`,
-                                        color: COLORS.secondary,
-                                      };
-                                    } else if (isCompleted) {
-                                      charStyle = {
-                                        ...charStyle,
-                                        backgroundColor: COLORS.secondary,
-                                        color: "white",
-                                      };
-                                    } else if (char === "□") {
-                                      charStyle = {
-                                        ...charStyle,
-                                        border: `1px solid ${COLORS.lightGray}`,
-                                      };
-                                    }
-
+                                  {translation.original.split("").map((char, charIndex) => {
+                                    // 선택된 글자의 정확한 인덱스 위치만 하이라이트
+                                    const isHighlighted = translation.selectedCharIndex >= 0 && charIndex === translation.selectedCharIndex;
+                                    
                                     return (
-                                      <span key={charIndex} className="inline-flex items-center justify-center" style={charStyle}>
-                                        {selectedChar}
+                                      <span
+                                        key={charIndex}
+                                        style={{
+                                          color: isHighlighted ? COLORS.secondary : COLORS.textDark,
+                                          backgroundColor: isHighlighted ? '#E8F4F8' : 'transparent',
+                                          fontWeight: isHighlighted ? 700 : 400,
+                                          padding: isHighlighted ? '2px 4px' : '0',
+                                          borderRadius: isHighlighted ? '4px' : '0',
+                                          border: isHighlighted ? `1px solid ${COLORS.secondary}` : 'none',
+                                        }}
+                                      >
+                                        {char}
                                       </span>
                                     );
                                   })}
@@ -1099,7 +1201,60 @@ const DetailPage = ({ item, onBack }) => {
                               <p className="text-xs text-gray-600 mb-2">번역문</p>
                               <div className="p-4 bg-gray-50 rounded border border-gray-200">
                                 <p className="text-base leading-relaxed text-gray-700">
-                                  {isLoadingTranslation ? "번역을 불러오는 중..." : translation[0] || "번역을 불러오는 중..."}
+                                  {isLoadingTranslation ? (
+                                    "번역을 불러오는 중..."
+                                  ) : (
+                                    translation.translation ? (
+                                      // 번역문에서 선택된 글자와 관련된 부분 하이라이트
+                                      (() => {
+                                        const translationText = translation.translation;
+                                        const originalText = translation.original;
+                                        
+                                        // 원문에서 선택된 글자의 정확한 인덱스 위치 사용
+                                        const selectedCharIndex = translation.selectedCharIndex;
+                                        
+                                        // 선택된 글자가 있으면 번역문에서 해당 위치 근처 하이라이트
+                                        if (selectedCharIndex >= 0) {
+                                          // 원문의 선택된 글자 위치 비율 계산
+                                          const originalRatio = selectedCharIndex / originalText.length;
+                                          
+                                          // 번역문을 단어/문장 단위로 분리
+                                          // 한문 번역은 보통 문장부호로 구분되므로 문장부호 기준으로 분리
+                                          const parts = translationText.split(/([。，、！？\s])/);
+                                          
+                                          // 원문 위치 비율에 해당하는 번역문 위치 찾기
+                                          const targetIndex = Math.floor(parts.length * originalRatio);
+                                          
+                                          return parts.map((part, idx) => {
+                                            // 선택된 글자 위치 근처(±2 범위) 하이라이트
+                                            const distance = Math.abs(idx - targetIndex);
+                                            const shouldHighlight = distance <= 2 && part.trim().length > 0;
+                                            
+                                            return (
+                                              <span
+                                                key={idx}
+                                                style={{
+                                                  color: shouldHighlight ? COLORS.secondary : 'inherit',
+                                                  backgroundColor: shouldHighlight ? '#E8F4F8' : 'transparent',
+                                                  fontWeight: shouldHighlight ? 700 : 400,
+                                                  padding: shouldHighlight ? '2px 4px' : '0',
+                                                  borderRadius: shouldHighlight ? '4px' : '0',
+                                                  border: shouldHighlight ? `1px solid ${COLORS.secondary}` : 'none',
+                                                }}
+                                              >
+                                                {part}
+                                              </span>
+                                            );
+                                          });
+                                        } else {
+                                          // 선택된 글자가 없으면 일반 표시
+                                          return translationText;
+                                        }
+                                      })()
+                                    ) : (
+                                      "번역을 불러오는 중..."
+                                    )
+                                  )}
                                 </p>
                               </div>
                             </div>
