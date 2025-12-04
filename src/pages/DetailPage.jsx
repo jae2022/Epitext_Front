@@ -28,6 +28,16 @@ const ensureArray = (text) => {
   return [];
 };
 
+// [MASK] 텍스트를 파싱하여 □로 보여주면서도 데이터 처리가 가능하게 함
+const processTextForDisplay = (textArray) => {
+  if (!textArray || !Array.isArray(textArray)) return [];
+  
+  return textArray.map(line => {
+    // [MASK1], [MASK2] 등을 모두 □로 치환
+    return line.replace(/\[MASK\d*\]/g, "□");
+  });
+};
+
 // 이미지 URL 해결 함수
 const resolveImageUrl = (imageUrl) => {
   if (!imageUrl) return '';
@@ -233,10 +243,13 @@ const DetailPage = ({ item, onBack }) => {
   }, [rubbingId]);
 
   // 텍스트 내용 처리
+  // 검수 UI에서는 좌표 일치를 위해 원본 OCR 텍스트(text_content) 사용
+  // 구두점 복원 텍스트는 글자 수가 달라져서 버튼 위치와 맞지 않음
   const sampleText = useMemo(() => {
     if (!rubbingDetail) return [];
-    const text = rubbingDetail.text_content_with_punctuation || rubbingDetail.text_content;
-    return ensureArray(text);
+    // 검수용 텍스트는 좌표가 맞는 text_content 사용
+    const rawTextLines = ensureArray(rubbingDetail.text_content);
+    return processTextForDisplay(rawTextLines);
   }, [rubbingDetail]);
 
   const handleCharClick = useCallback((charId) => {
@@ -551,7 +564,7 @@ const DetailPage = ({ item, onBack }) => {
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">검수 대상 글자 수</p>
-                    <p className="text-base font-semibold">78자</p>
+                    <p className="text-base font-semibold">{statistics?.restoration_targets || 0}자</p>
                   </div>
                   <div className="p-3 bg-gray-50 rounded">
                     <p className="text-xs text-gray-600 mb-1">평균 신뢰도</p>
