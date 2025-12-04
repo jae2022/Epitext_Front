@@ -243,14 +243,52 @@ const DetailPage = ({ item, onBack }) => {
   }, [rubbingId]);
 
   // 텍스트 내용 처리
-  // 검수 UI에서는 좌표 일치를 위해 원본 OCR 텍스트(text_content) 사용
-  // 구두점 복원 텍스트는 글자 수가 달라져서 버튼 위치와 맞지 않음
+  // 검수 UI에서 줄바꿈이 적용된 '구두점 복원 텍스트'를 우선 사용
+  // 데이터가 없으면 원본 텍스트 사용
   const sampleText = useMemo(() => {
     if (!rubbingDetail) return [];
-    // 검수용 텍스트는 좌표가 맞는 text_content 사용
-    const rawTextLines = ensureArray(rubbingDetail.text_content);
+    const textToUse = rubbingDetail.text_content_with_punctuation || rubbingDetail.text_content;
+    const rawTextLines = ensureArray(textToUse);
     return processTextForDisplay(rawTextLines);
   }, [rubbingDetail]);
+
+  // 순서 기반 매핑 테이블 생성 및 화면상 위치 계산
+  // 텍스트의 □ 순서와 DB의 Target을 매칭하고, '화면상 위치'를 계산합니다.
+  const { targetMap, visualPosMap } = useMemo(() => {
+    const map = {};       // 텍스트 클릭용 (key: "행-열", value: target)
+    const posMap = {};    // 버튼 표시용 (key: target.id, value: "N행 M자")
+    
+    let maskCounter = 0;
+    
+    // ID순으로 정렬 (텍스트의 □ 순서와 일치시킴)
+    const sortedTargets = [...restorationTargets].sort((a, b) => a.id - b.id);
+
+    // sampleText(화면에 보이는 줄바꿈된 텍스트)를 순회하며 위치 재계산
+    sampleText.forEach((line, rowIndex) => {
+      const chars = line.split("");
+      let charIndexInLine = 0; // 한글/한자/문장부호 포함한 실제 인덱스
+
+      chars.forEach((char) => {
+        // 텍스트 렌더링 로직과 동일하게 인덱싱
+        if (char === "□") {
+          if (maskCounter < sortedTargets.length) {
+            const target = sortedTargets[maskCounter];
+            
+            // 1. 텍스트 클릭을 위한 매핑
+            map[`${rowIndex}-${charIndexInLine}`] = target;
+            
+            // 2. [핵심] 버튼에 표시할 '화면상 위치' 계산 (1부터 시작)
+            posMap[target.id] = `${rowIndex + 1}행 ${charIndexInLine + 1}자`;
+            
+            maskCounter++;
+          }
+        }
+        charIndexInLine++;
+      });
+    });
+    
+    return { targetMap: map, visualPosMap: posMap };
+  }, [sampleText, restorationTargets]);
 
   const handleCharClick = useCallback((charId) => {
     setSelectedCharId((prev) => (prev === charId ? null : charId));
@@ -645,7 +683,7 @@ const DetailPage = ({ item, onBack }) => {
                       className={buttonClass}
                       style={{ width: "fit-content", minWidth: "88px", ...buttonStyle }}
                     >
-                      {target.position}
+                      {visualPosMap[target.id] || target.position}
                     </button>
                   );
                 })}
@@ -658,15 +696,19 @@ const DetailPage = ({ item, onBack }) => {
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {sampleText.map((text, rowIndex) => {
-                    const targetsInRow = targetsByRow[rowIndex] || [];
-                    const selectedTargetInRow = targetsInRow.find((t) => t.id === selectedCharId);
-                    const showTable = selectedTargetInRow && candidates[selectedCharId] && candidates[selectedCharId].length > 0;
+                    // 해당 행에 선택된 타겟이 있는지 확인 (테이블 표시용)
+                    const isRowSelected = text.split("").some((_, charIndex) => {
+                      const target = targetMap[`${rowIndex}-${charIndex}`];
+                      return target?.id === selectedCharId;
+                    });
+                    const showTable = isRowSelected && candidates[selectedCharId] && candidates[selectedCharId].length > 0;
 
                     return (
                       <div key={rowIndex} style={{ marginBottom: "12px" }}>
                         <div className="text-base mb-0 font-medium" style={STYLES.textContainer}>
                           {text.split("").map((char, charIndex) => {
-                            const target = targetsInRow.find((t) => t.char === charIndex);
+                            // 순서 기반 매핑: targetMap을 통해 타겟 조회
+                            const target = targetMap[`${rowIndex}-${charIndex}`];
                             const charId = target ? target.id : null;
                             const isSelected = selectedCharId === charId;
                             const isCompleted = charId && checkedChars.has(charId);
