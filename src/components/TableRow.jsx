@@ -66,9 +66,8 @@ const TableRow = ({ row, index, isSelected, onSelect, onViewDetail }) => {
     }
   };
 
-  // 탁본 복원 버튼 비활성화할 ID 목록 (7, 5, 3, 2)
-  const disabledRestoreIds = [7, 5, 3, 2];
-  const isRestoreDisabled = status === "처리중" || disabledRestoreIds.includes(id);
+  // 복원 시각화 버튼은 현재 구현되지 않았으므로 모든 경우에 비활성화
+  const isRestoreDisabled = true;
 
   // 최종 결과 버튼 border 색상 (활성화 시 #ebedf8, 비활성화 시 #fafbfd)
   const resultBorderColor = status === "처리중" ? "#fafbfd" : "#ebedf8";

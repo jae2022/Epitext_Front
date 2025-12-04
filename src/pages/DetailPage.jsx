@@ -131,7 +131,7 @@ const DetailPage = ({ item, onBack }) => {
   const [selectedCharacters, setSelectedCharacters] = useState({}); // charId -> selected character
   const [showReasonPopup, setShowReasonPopup] = useState(false);
   const [selectedCharForCluster, setSelectedCharForCluster] = useState(null); // cluster에서 표시할 선택된 글자
-  const [translation, setTranslation] = useState({ original: "", translation: "" }); // 번역문과 원문
+  const [translation, setTranslation] = useState({ original: "", translation: "", selectedCharIndex: -1 }); // 번역문과 원문, 선택된 글자 인덱스
   const [isLoadingTranslation, setIsLoadingTranslation] = useState(false); // 번역 로딩 상태
 
   // API에서 데이터 로드
@@ -1052,7 +1052,8 @@ const DetailPage = ({ item, onBack }) => {
                                         .then((data) => {
                                           setTranslation({
                                             original: data.original || "",
-                                            translation: data.translation || ""
+                                            translation: data.translation || "",
+                                            selectedCharIndex: data.selected_char_index !== undefined ? data.selected_char_index : -1
                                           });
                                         })
                                         .catch((err) => {
@@ -1136,17 +1137,19 @@ const DetailPage = ({ item, onBack }) => {
                                 data = await getTranslation(rubbingDetail.id, selectedCharId);
                               }
 
-                              // [수정] 번역 API가 반환하는 original과 translation을 모두 저장
+                              // [수정] 번역 API가 반환하는 original, translation, selectedCharIndex를 모두 저장
                               setTranslation({
                                 original: data.original || "",
-                                translation: data.translation || ""
+                                translation: data.translation || "",
+                                selectedCharIndex: data.selected_char_index !== undefined ? data.selected_char_index : -1
                               });
                               
                             } catch (error) {
                               console.error("번역 로드 실패:", error);
                               setTranslation({
                                 original: "",
-                                translation: "번역을 불러오는데 실패했습니다."
+                                translation: "번역을 불러오는데 실패했습니다.",
+                                selectedCharIndex: -1
                               });
                             } finally {
                               setIsLoadingTranslation(false);
@@ -1170,11 +1173,26 @@ const DetailPage = ({ item, onBack }) => {
                               <p className="text-xs text-gray-600 mb-2">원문</p>
                               <div className="p-4 bg-gray-50 rounded border border-gray-200">
                                 <p className="text-base leading-relaxed" style={STYLES.textContainer}>
-                                  {translation.original.split("").map((char, charIndex) => (
-                                    <span key={charIndex} style={{ color: COLORS.textDark }}>
-                                      {char}
-                                    </span>
-                                  ))}
+                                  {translation.original.split("").map((char, charIndex) => {
+                                    // 선택된 글자의 정확한 인덱스 위치만 하이라이트
+                                    const isHighlighted = translation.selectedCharIndex >= 0 && charIndex === translation.selectedCharIndex;
+                                    
+                                    return (
+                                      <span
+                                        key={charIndex}
+                                        style={{
+                                          color: isHighlighted ? COLORS.secondary : COLORS.textDark,
+                                          backgroundColor: isHighlighted ? '#E8F4F8' : 'transparent',
+                                          fontWeight: isHighlighted ? 700 : 400,
+                                          padding: isHighlighted ? '2px 4px' : '0',
+                                          borderRadius: isHighlighted ? '4px' : '0',
+                                          border: isHighlighted ? `1px solid ${COLORS.secondary}` : 'none',
+                                        }}
+                                      >
+                                        {char}
+                                      </span>
+                                    );
+                                  })}
                                 </p>
                               </div>
                             </div>
@@ -1183,7 +1201,60 @@ const DetailPage = ({ item, onBack }) => {
                               <p className="text-xs text-gray-600 mb-2">번역문</p>
                               <div className="p-4 bg-gray-50 rounded border border-gray-200">
                                 <p className="text-base leading-relaxed text-gray-700">
-                                  {isLoadingTranslation ? "번역을 불러오는 중..." : translation.translation || "번역을 불러오는 중..."}
+                                  {isLoadingTranslation ? (
+                                    "번역을 불러오는 중..."
+                                  ) : (
+                                    translation.translation ? (
+                                      // 번역문에서 선택된 글자와 관련된 부분 하이라이트
+                                      (() => {
+                                        const translationText = translation.translation;
+                                        const originalText = translation.original;
+                                        
+                                        // 원문에서 선택된 글자의 정확한 인덱스 위치 사용
+                                        const selectedCharIndex = translation.selectedCharIndex;
+                                        
+                                        // 선택된 글자가 있으면 번역문에서 해당 위치 근처 하이라이트
+                                        if (selectedCharIndex >= 0) {
+                                          // 원문의 선택된 글자 위치 비율 계산
+                                          const originalRatio = selectedCharIndex / originalText.length;
+                                          
+                                          // 번역문을 단어/문장 단위로 분리
+                                          // 한문 번역은 보통 문장부호로 구분되므로 문장부호 기준으로 분리
+                                          const parts = translationText.split(/([。，、！？\s])/);
+                                          
+                                          // 원문 위치 비율에 해당하는 번역문 위치 찾기
+                                          const targetIndex = Math.floor(parts.length * originalRatio);
+                                          
+                                          return parts.map((part, idx) => {
+                                            // 선택된 글자 위치 근처(±2 범위) 하이라이트
+                                            const distance = Math.abs(idx - targetIndex);
+                                            const shouldHighlight = distance <= 2 && part.trim().length > 0;
+                                            
+                                            return (
+                                              <span
+                                                key={idx}
+                                                style={{
+                                                  color: shouldHighlight ? COLORS.secondary : 'inherit',
+                                                  backgroundColor: shouldHighlight ? '#E8F4F8' : 'transparent',
+                                                  fontWeight: shouldHighlight ? 700 : 400,
+                                                  padding: shouldHighlight ? '2px 4px' : '0',
+                                                  borderRadius: shouldHighlight ? '4px' : '0',
+                                                  border: shouldHighlight ? `1px solid ${COLORS.secondary}` : 'none',
+                                                }}
+                                              >
+                                                {part}
+                                              </span>
+                                            );
+                                          });
+                                        } else {
+                                          // 선택된 글자가 없으면 일반 표시
+                                          return translationText;
+                                        }
+                                      })()
+                                    ) : (
+                                      "번역을 불러오는 중..."
+                                    )
+                                  )}
                                 </p>
                               </div>
                             </div>
