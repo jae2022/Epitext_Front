@@ -1123,9 +1123,22 @@ const DetailPage = ({ item, onBack }) => {
 
                             setIsLoadingTranslation(true);
                             try {
-                              const data = await getTranslation(rubbingDetail.id, selectedCharId);
+                              let data;
+                              
+                              // [수정됨] 사용자가 선택한 후보(selectedCharForCluster)가 있으면 '미리보기 API' 호출
+                              if (selectedCharForCluster) {
+                                console.log("선택된 글자로 번역:", selectedCharForCluster);
+                                data = await previewTranslation(rubbingDetail.id, selectedCharId, selectedCharForCluster);
+                              } else {
+                                // 선택된 후보가 없으면 '기본 번역 API' 호출 (원본 □ 유지)
+                                console.log("원본 텍스트 번역");
+                                data = await getTranslation(rubbingDetail.id, selectedCharId);
+                              }
+
                               setTranslation([data.translation]);
+                              // setSelectedRowIndex는 이제 필요 없지만(백엔드에서 줄을 찾음), UI 유지를 위해 둡니다.
                               setSelectedRowIndex(target.row);
+                              
                             } catch (error) {
                               console.error("번역 로드 실패:", error);
                               setTranslation(["번역을 불러오는데 실패했습니다."]);
