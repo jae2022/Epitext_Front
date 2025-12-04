@@ -211,7 +211,19 @@ const DetailPage = ({ item, onBack }) => {
         setReasoningData(reasoningMap);
       } catch (err) {
         console.error("Failed to load detail data:", err);
-        setError(err.message || "데이터를 불러오는데 실패했습니다.");
+        // 더 자세한 에러 메시지
+        let errorMessage = "데이터를 불러오는데 실패했습니다.";
+        if (err.response) {
+          // 서버가 응답했지만 에러 상태 코드
+          errorMessage = `서버 오류 (${err.response.status}): ${err.response.data?.error || err.response.statusText}`;
+        } else if (err.request) {
+          // 요청은 보냈지만 응답이 없음
+          errorMessage = "서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.";
+        } else {
+          // 요청 설정 중 에러
+          errorMessage = err.message || errorMessage;
+        }
+        setError(errorMessage);
       } finally {
         setIsLoading(false);
       }
@@ -275,7 +287,8 @@ const DetailPage = ({ item, onBack }) => {
   );
 
   const inspectionCount = checkedChars.size;
-  const totalInspectionTargets = statistics?.restoration_targets || 0; // 검수 대상 글자 수
+  // 검수 대상 글자 수는 복원 대상 글자 수와 동일
+  const totalInspectionTargets = statistics?.restoration_targets || restorationTargets.length || 0;
 
   // 신뢰도 통계 계산
   const reliabilityStats = useMemo(() => {
@@ -637,7 +650,7 @@ const DetailPage = ({ item, onBack }) => {
                     const showTable = selectedTargetInRow && candidates[selectedCharId] && candidates[selectedCharId].length > 0;
 
                     return (
-                      <div key={rowIndex}>
+                      <div key={rowIndex} style={{ marginBottom: "12px" }}>
                         <div className="text-base mb-0 font-medium" style={STYLES.textContainer}>
                           {text.split("").map((char, charIndex) => {
                             const target = targetsInRow.find((t) => t.char === charIndex);
@@ -690,7 +703,12 @@ const DetailPage = ({ item, onBack }) => {
                             }
 
                             return (
-                              <span key={charIndex} className={charClass} onClick={() => handleCharClick(charId)} style={charStyle}>
+                              <span 
+                                key={charIndex} 
+                                className={charClass} 
+                                onClick={() => charId && handleCharClick(charId)} 
+                                style={charStyle}
+                              >
                                 {selectedChar}
                               </span>
                             );
