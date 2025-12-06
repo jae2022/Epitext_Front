@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import ReasoningCluster from "../components/ReasoningCluster";
-import { formatDate, formatProcessingTime } from "../mocks/mockData";
 import {
   getRubbingDetail,
   getRestorationTargets,
@@ -9,6 +8,8 @@ import {
   getTranslation,
   previewTranslation,
   inspectTarget,
+  formatDate,
+  formatProcessingTime,
 } from "../api/requests";
 
 // 유틸리티 함수: 텍스트 내용을 배열로 변환

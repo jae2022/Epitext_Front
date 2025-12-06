@@ -3,7 +3,7 @@ import apiClient from "./client";
 /**
  * 날짜 포맷팅 (YYYY-MM-DD -> YYYY.MM.DD)
  */
-const formatDate = (dateString) => {
+export const formatDate = (dateString) => {
   if (!dateString) return "-";
   const date = new Date(dateString);
   const year = date.getFullYear();
@@ -15,7 +15,7 @@ const formatDate = (dateString) => {
 /**
  * 처리 시간 포맷팅 (초 -> X분 Y초)
  */
-const formatProcessingTime = (seconds) => {
+export const formatProcessingTime = (seconds) => {
   if (!seconds) return "-";
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
