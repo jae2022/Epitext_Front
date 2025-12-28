@@ -21,7 +21,7 @@ EPITEXT는 훼손·유실된 탁본(금석문) 문자를 멀티모달 AI로 복�
 
 ### 🎥 EPITEXT 시연 영상
 
-[![EPITEXT Demo](https://img.youtube.com/vi/영상ID/0.jpg)](https://www.youtube.com/watch?v=TJlI6UMyEFw)
+[![EPITEXT Demo]](https://www.youtube.com/watch?v=TJlI6UMyEFw)
 
 ## 🛠️ 기술 스택
 
