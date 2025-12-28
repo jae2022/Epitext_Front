@@ -1,21 +1,21 @@
 <div><img src="https://capsule-render.vercel.app/api?type=waving&color=auto&height=340&section=header&text=EPITEXT&fontSize=90" /></div>
 
-# 프로젝트 소개
+# 📜 프로젝트 소개
 
-## About
+## 🤔 About
 
-안녕하세요! 고려대학교 지능정보 SW 아카데미 7기 팀 복원왕 김탁본 입니다!
+안녕하세요 고려대학교 지능정보 SW 아카데미 7기 팀 복원왕 김탁본 입니다
 
-## 팀 멤버
+## ☺️ 팀 멤버
 
 | 이름 | 이메일 | 담당 |
 |---|---|---|
-| 황동현 | myjewel29@naver.com | 이미지 전처리 및 OCR 설계 |
-| 장예진 | dpwls6284@naver.com | SikuRoBERTa 모델 학습 |
-| 안성민 | tjdals2299@gmail.com | SikuRoBERTa 및 Swin V2 모델 학습 |
+| 황동현 | myjewel29@naver.com | 앙상블 문자 인식 기술(OCR) 설계 |
+| 장예진 | dpwls6284@naver.com | [SikuRoBERTa](https://huggingface.co/jhangyejin/epitext-sikuroberta) 학습 및 번역 LLM 프롬프트 설계 |
+| 안성민 | tjdals2299@gmail.com | 이미지 전처리 및 [Swin V2](https://huggingface.co/ANSEONGMIN/hanja-swinv2) 학습 |
 | 최준형 | jbro2018@naver.com | EPITEXT 서비스 디자인 및 개발 |
 
-# EPITEXT 소개
+## 🧑🏻‍💻 EPITEXT 소개
 
 EpiText는 훼손·유실된 탁본(금석문) 문자를 멀티모달 AI로 복원하고, 최종 판독과 번역까지 이어지는 전문가 의사결정 지원 서비스입니다. 탁본 이미지를 업로드하면 전처리와 OCR 앙상블(Google Vision OCR + 고문서 특화 OCR) 로 텍스트를 추출하고, 글자 손상 정도를 자동 분류해 복원 전략을 달리 적용합니다. 형태가 완전히 사라진 영역은 언어 모델(SikuRoBERTa) 이 문맥 기반으로 추론하고, 일부 획이 남은 영역은 비전 모델(Swin V2) 까지 관여하여 잔여 획을 분석해 예측합니다. 두 모델의 결과는 확률 결합으로 통합되어 Top-5 후보로 제시되며, 사용자는 근거 시각화(Reasoning Cluster)와 번역 하이라이트를 통해 빠르고 신뢰성 있게 검수·확정할 수 있습니다.
 
