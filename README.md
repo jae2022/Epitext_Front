@@ -1,3 +1,5 @@
+<div><img src="https://capsule-render.vercel.app/api?type=waving&color=auto&height=340&section=header&text=EPITEXT&fontSize=90" /></div>
+
 # EPITEXT Frontend
 
 탁본 복원 관리 시스템의 프론트엔드 애플리케이션입니다. React 기반의 모던한 웹 인터페이스를 제공합니다.
