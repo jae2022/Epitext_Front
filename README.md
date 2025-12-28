@@ -1,5 +1,9 @@
 <div><img src="https://capsule-render.vercel.app/api?type=waving&color=auto&height=340&section=header&text=EPITEXT&fontSize=90" /></div>
 
+# EPITEXT 소개
+
+EpiText는 훼손·유실된 탁본(금석문) 문자를 멀티모달 AI로 복원하고, 최종 판독과 번역까지 이어지는 전문가 의사결정 지원 서비스입니다. 탁본 이미지를 업로드하면 전처리와 OCR 앙상블(Google Vision OCR + 고문서 특화 OCR) 로 텍스트를 추출하고, 글자 손상 정도를 자동 분류해 복원 전략을 달리 적용합니다. 형태가 완전히 사라진 영역은 언어 모델(SikuRoBERTa) 이 문맥 기반으로 추론하고, 일부 획이 남은 영역은 비전 모델(Swin V2) 까지 관여하여 잔여 획을 분석해 예측합니다. 두 모델의 결과는 확률 결합으로 통합되어 Top-5 후보로 제시되며, 사용자는 근거 시각화(Reasoning Cluster)와 번역 하이라이트를 통해 빠르고 신뢰성 있게 검수·확정할 수 있습니다.
+
 # EPITEXT Frontend
 
 탁본 복원 관리 시스템의 프론트엔드 애플리케이션입니다. React 기반의 모던한 웹 인터페이스를 제공합니다.
