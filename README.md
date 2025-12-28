@@ -41,6 +41,9 @@ EPITEXT는 훼손·유실된 탁본(금석문) 문자를 멀티모달 AI로 복�
 
 탁본 복원 관리 시스템의 프론트엔드 애플리케이션입니다. React 기반의 모던한 웹 인터페이스를 제공합니다.
 
+EpiText 서비스의 백엔드 소스 코드는 아래 GitHub 저장소에서 확인하실 수 있습니다.
+- 🔗 Backend Repository: https://github.com/jae2022/Epitext_Back
+
 ## 🖥️ 시스템 요구사항
 
 ### 필수 요구사항
