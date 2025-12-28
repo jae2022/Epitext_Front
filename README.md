@@ -1,6 +1,12 @@
 <div><img src="https://capsule-render.vercel.app/api?type=waving&color=auto&height=340&section=header&text=EPITEXT&fontSize=90" /></div>
 
-# 프로젝트 팀 멤버 소개
+# 프로젝트 소개
+
+## About
+
+안녕하세요! 고려대학교 지능정보 SW 아카데미 7기 팀 복원왕 김탁본 입니다!
+
+## 팀 멤버
 
 | 이름 | 이메일 | 담당 |
 |---|---|---|
